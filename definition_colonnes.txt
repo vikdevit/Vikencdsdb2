@@ -1,0 +1,50 @@
+Signification des champs
+1. X et Y :
+Coordonnées spatiales de la zone d'étude dans la forêt (emplacement).
+X : Coordonnée horizontale (longitude relative ou section de la zone).
+Y : Coordonnée verticale (latitude relative ou section de la zone).
+Ces coordonnées sont exprimées sur une échelle arbitraire (par exemple, des indices cartésiens pour des zones de la forêt).
+
+2. month :
+Mois de l'année où l'incident s'est produit.
+Représenté par des abréviations textuelles en anglais (par exemple, "jan" pour janvier, "feb" pour février, etc.).
+
+3. day :
+Jour de la semaine où l'incident s'est produit.
+Représenté par des abréviations textuelles en anglais (par exemple, "mon" pour lundi, "tue" pour mardi, etc.).
+
+4. FFMC (Fine Fuel Moisture Code) :
+Indicateur de l'humidité des combustibles fins comme les herbes sèches ou les feuilles.
+Une valeur élevée indique que les combustibles fins sont très secs, ce qui facilite l'allumage du feu.
+Échelle : 0 à 101.
+
+5. DMC (Duff Moisture Code) :
+Mesure de l'humidité des couches organiques compactes du sol (couches intermédiaires).
+Une valeur élevée reflète des conditions sèches, favorisant la propagation du feu.
+Échelle : sans limite définie, mais souvent autour de 0 à 100+.
+
+6. DC (Drought Code) :
+Mesure des conditions de sécheresse des combustibles profonds comme les racines ou les sols très organiques.
+Plus cette valeur est élevée, plus les conditions de sécheresse sont sévères.
+Échelle : 0 à 800+.
+
+7. ISI (Initial Spread Index) :
+Indicateur du potentiel initial de propagation d'un feu.
+Calculé à partir de la vitesse du vent et du FFMC.
+Échelle : sans limite définie (généralement entre 0 et 50).
+
+8. temp (Temperature) :
+Température moyenne de la journée (en degrés Celsius).
+
+9. RH (Relative Humidity) :
+Humidité relative de l'air, en pourcentage (%).
+
+10. wind :
+Vitesse moyenne du vent (en km/h).
+
+11. rain :
+Précipitations totales (en mm) enregistrées ce jour-là.
+
+12. area :
+Surface totale brûlée par le feu (en hectares, ha).
+Note : Les valeurs très petites (inférieures à 1) indiquent parfois des zones où le feu a été contenu rapidement.
