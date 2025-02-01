@@ -1,0 +1,76 @@
+
+Heatmap
+comment interpréter les résultats de heatmap ci-dessous cas tout le dataframe avec et sans surface brulee, 0,79 entre FFMC et ISI, 0,79 entre FMC et ISI    cas surface brulee nulle 0,76 entre ISI et FFMC, 0,7 entre BUI et DC, cas surface brulee non nulle 0,8 entre FFMC et ISI et dans tous les cas pas de correlation franche entre les autres combinaisons de paramètres X, Y, BUI, temperature, FFMC, DMC, DC, ISI, RH, wind
+Interprétation des corrélations issues des heatmaps
+Les valeurs de corrélation varient entre -1 et 1 :
+
+Corrélation proche de 1 → Forte corrélation positive (les variables évoluent ensemble).
+Corrélation proche de -1 → Forte corrélation négative (quand une variable augmente, l'autre diminue).
+Corrélation proche de 0 → Pas ou peu de relation linéaire entre les variables.
+
+Corrélation forte entre FFMC et ISI (~0.79 - 0.80)
+📌 Explication :
+
+FFMC (Fine Fuel Moisture Code) et ISI (Initial Spread Index) sont deux indices du système canadien de prévision des incendies.
+FFMC reflète l’humidité des combustibles légers comme les feuilles mortes et l'herbe sèche.
+ISI quantifie la vitesse de propagation initiale du feu, influencée par le vent et la sécheresse.
+Pourquoi une forte corrélation ? 🔥
+Plus FFMC est élevé (combustibles plus secs), plus le feu se propage rapidement → ISI augmente.
+Cette relation est logique, car des combustibles plus secs accélèrent la propagation.
+🔎 Dans tous les cas (avec/sans feu), la corrélation est stable (~0.79-0.80), ce qui suggère une relation structurelle et non accidentelle.
+
+Corrélation modérée entre BUI et DC (~0.70 dans le cas sans feu)
+📌 Explication :
+
+BUI (Build-Up Index) mesure l’énergie accumulée dans le feuillage et le bois mort moyen.
+DC (Drought Code) mesure la sécheresse à long terme des combustibles profonds comme les racines et les souches.
+Pourquoi une corrélation ? 🌡
+Quand la sécheresse s’accentue (DC augmente), le stress hydrique des forêts augmente également, ce qui fait monter le BUI.
+Cette corrélation est plus forte quand il n’y a pas de feu car dans les zones brûlées, les valeurs du BUI peuvent être modifiées par la combustion elle-même.
+🔎 Corrélation présente uniquement en l’absence de feu → Peut suggérer que lorsque le feu est présent, d'autres facteurs (vent, température) influencent davantage le BUI.
+
+ Absence de corrélation forte entre X, Y, BUI, température, FFMC, DMC, DC, ISI, RH, wind
+📌 Explication :
+
+X et Y (coordonnées spatiales) ne sont pas corrélées avec les indices de feu, ce qui signifie que la localisation seule n’explique pas directement les conditions de feu.
+Température, humidité relative (RH) et vent ne montrent pas de forte corrélation avec les autres variables → Cela peut signifier que les conditions météo varient trop fortement sur l’ensemble des observations pour produire une relation stable.
+DMC (Duff Moisture Code) ne montre pas de forte corrélation avec d’autres indices → Cela peut suggérer qu’il n’est pas un facteur dominant dans la dynamique des incendies dans ce jeu de données.
+🔎 Pas de corrélations fortes → Signifie probablement que le feu est influencé par une combinaison complexe de facteurs plutôt que par un seul élément dominant.
+
+Conclusion générale
+✅ FFMC et ISI ont une forte relation structurelle dans tous les cas → Cela confirme leur importance dans la prédiction de la propagation du feu.
+✅ BUI et DC sont liés mais seulement en l'absence de feu → Montre l'effet du feu sur ces indices.
+✅ Aucune autre relation nette entre variables météo et indices d'incendie → Peut indiquer que la dynamique du feu dépend de plusieurs facteurs simultanés.
+
+💡 Interprétation possible :
+Les résultats confirment le rôle central de l'humidité du sol et de la végétation dans la propagation du feu, mais montrent aussi que d'autres variables (température, vent) interagissent de façon plus complexe et nécessitent peut-être des analyses supplémentaires. 🚀
+
+
+
+Stats inférentielles
+l'analyse montre que pour bui et temp il y a une différence significative entre les deux groupes que ocnclure poru ces variables et les autres ?
+Pour les variables BUI (Building Urban Index) et temp (température), où tu as trouvé une différence significative entre les deux groupes (surface brûlée nulle vs surface brûlée non nulle), voici ce que tu pourrais conclure :
+
+1. Conclusion pour les variables avec une différence significative (BUI et temp) :
+Température (temp) : Une température plus élevée semble être associée à une plus grande probabilité que la surface soit brûlée. Autrement dit, les incendies ont tendance à se produire plus fréquemment ou sont plus graves lorsque la température est plus élevée, ce qui est attendu étant donné que la chaleur augmente le risque d'incendie.
+
+BUI (Building Urban Index) : Si le BUI montre une différence significative, cela suggère qu'il existe une relation entre le risque d'incendie et la densité ou la nature urbaine des zones. Il pourrait signifier que des zones avec des caractéristiques urbaines particulières (densité de construction, type de terrain, etc.) présentent un risque plus élevé d'incendie ou sont plus susceptibles d'être affectées par des incendies.
+
+Dans les deux cas, cela montre que ces deux variables sont probablement des facteurs importants dans l'apparition ou la propagation des incendies, et leur influence est statistiquement significative dans la distinction entre les groupes.
+
+2. Conclusion pour les autres variables sans différence significative (FFMC, DMC, DC, ISI, RH, wind) :
+Pour les variables comme FFMC, DMC, DC, ISI, RH (humidité relative), wind (vent), tu as trouvé qu'il n'y a pas de différence significative entre les deux groupes. Cela suggère que, dans le cadre de cette analyse, ces facteurs ne semblent pas jouer un rôle crucial dans la distinction entre les zones avec ou sans surface brûlée, du moins pour cette période de données et dans les conditions analysées.
+
+Cela peut aussi signifier que, bien que ces facteurs soient liés au comportement des incendies (par exemple, le vent et l'humidité peuvent avoir un impact direct sur la propagation), ils ne sont pas suffisamment distincts entre les zones brûlées et non brûlées dans ce dataset spécifique. Cela ne veut pas nécessairement dire qu'ils ne sont pas importants dans d'autres contextes, mais dans ce cas précis, ils ne montrent pas de différence significative entre les deux groupes.
+
+3. Interprétation générale :
+Variables avec différence significative : La température et le BUI sont des facteurs qui semblent affecter la probabilité de surface brûlée. Il est donc pertinent d'approfondir l'analyse de ces variables pour mieux comprendre comment elles influencent les incendies dans cette région.
+
+Variables sans différence significative : D'autres facteurs comme FFMC, DMC, DC, ISI, RH, et wind ne montrent pas de différence significative, mais cela ne signifie pas qu'ils n'ont pas d'importance dans d'autres analyses ou contextes. Il pourrait être intéressant de tester ces variables dans un modèle plus complexe ou de les combiner avec d'autres variables pour voir si elles peuvent expliquer les incendies de manière différente.
+
+Proposition de prochaine étape :
+Exploration des interactions : Tu pourrais explorer des interactions entre ces variables pour voir si une combinaison de plusieurs facteurs (par exemple, température + vent ou température + BUI) montre une relation plus significative avec la surface brûlée. Parfois, les relations non linéaires ou les effets combinés entre plusieurs variables sont plus révélateurs.
+
+Modélisation plus poussée : Une approche comme la régression logistique ou un modèle de machine learning pourrait permettre d'examiner comment plusieurs variables interagissent ensemble pour prédire le risque d'incendie, plutôt que de tester chaque variable indépendamment.
+
+En résumé, pour BUI et temp, tu as trouvé que ces variables sont significativement liées au fait qu'une surface soit brûlée ou non, tandis que pour d'autres variables, comme le vent ou l'humidité, il n'y a pas de relation évidente dans ton analyse. Cela guide l'interprétation de ton étude : certaines variables jouent un rôle plus direct dans la dynamique des incendies que d'autres.
