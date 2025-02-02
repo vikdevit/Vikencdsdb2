@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import rpy2.robjects
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
@@ -8,11 +9,18 @@ import os
 from matplotlib.backends.backend_pdf import PdfPages
 from fpdf import FPDF
 from scipy import stats
+from scipy.stats import chi2_contingency
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-
+from rpy2.robjects import pandas2ri, r
+from rpy2.robjects.packages import importr
+#rpy2.robjects.r('install.packages("forecast")')
+import psycopg2
+from psycopg2 import sql
+from psycopg2 import OperationalError
+from psycopg2.extras import execute_values
 
 # 1-Collecte, compréhension et audit de la qualité des données
 # Chargement des données dans un dataframe
@@ -192,7 +200,8 @@ def calculate_bui(dmc, dc):
         (0.8 * dmc * dc) / (dmc + 0.4 * dc),
         dmc - (1 - (0.8 * dc) / (dmc + 0.4 * dc)) * (0.92 + (0.0114 * dmc) ** 1.7)
     )
-    return bui
+    rounded_bui = np.round(bui, 1)
+    return rounded_bui
 
 df_cleaned['BUI'] = calculate_bui(df_cleaned['DMC'], df_cleaned['DC'])
 
@@ -209,7 +218,9 @@ print(df_cleaned.head())
 # Ajout d'une colonne estimant le FWI index à partir d'une formule simplifiée selon publication de Van Wagner (1987)
 def calculate_fwi(isi, bui):
     #return np.exp(0.05039 * isi) * bui ** 0.82 formule à vérifier
-    return np.sqrt(0.1 * isi * bui)
+    fwi = np.sqrt(0.1 * isi * bui)
+    rounded_fwi = np.round(fwi, 1)
+    return rounded_fwi
 
 df_cleaned['FWI'] = calculate_fwi(df_cleaned['ISI'], df_cleaned['BUI'])
 
@@ -296,6 +307,11 @@ plt.show()
 
 print("##################################################################################")
 
+# Ajout d'une colonne pour transformation logarithmique de 'area' pour améliorer la normalité
+df_cleaned['log_area'] = np.log1p(df_cleaned['area'])
+
+print("##################################################################################")
+
 # Création de deux dataframe sous-ensembles de df_cleaned (area = 0 et area != 0)
 
 # Filtrer les lignes où 'area' est égal à 0
@@ -316,7 +332,7 @@ print("#########################################################################
 # 3-Analyse et Visualisation des données
 # Analyses univariées
 # 📁 Création du répertoire pour les analyses univariées
-save_dir = "ananlyse_distrib_univariee"
+save_dir = "analyse_distrib_univariee"
 os.makedirs(save_dir, exist_ok=True)
 
 # Mesure de l'aplatissement de chaque distribution (kurtosis)
@@ -330,7 +346,7 @@ pdf.set_font("Arial", 'B', 16)
 pdf.cell(200, 10, txt="Analyse de la Kurtosis et de la Distribution", ln=True, align="C")
 
 # Liste des colonnes à tester
-columns_to_test = ["X", "Y", "FFMC", "DMC", "DC", "ISI", "BUI", "temp", "RH", "wind", "rain", "area", "FWI"]
+columns_to_test = ["X", "Y", "FFMC", "DMC", "DC", "ISI", "BUI", "temp", "RH", "wind", "rain", "area", "log_area", "FWI"]
 
 # Tester la kurtosis pour chaque colonne et écrire dans le PDF
 pdf.ln(10)  # espace après le titre
@@ -386,7 +402,7 @@ pdf.set_font("Arial", 'B', 16)
 pdf.cell(200, 10, txt="Analyse de la Skewness et de la Distribution", ln=True, align="C")
 
 # Liste des colonnes à tester
-columns_to_test = ["X", "Y", "FFMC", "DMC", "DC", "ISI", "BUI", "temp", "RH", "wind", "rain", "area", "FWI"]
+columns_to_test = ["X", "Y", "FFMC", "DMC", "DC", "ISI", "BUI", "temp", "RH", "wind", "rain", "area", "log_area", "FWI"]
 
 # Tester la skewness pour chaque colonne et écrire dans le PDF
 pdf.ln(10)  # espace après le titre
@@ -432,7 +448,7 @@ print("#########################################################################
 sns.set_style("whitegrid")
 
 # Séparation des variables numériques et catégoriques
-num_vars = ["X", "Y", "FFMC", "DMC", "DC", "ISI", "BUI", "temp", "RH", "wind", "rain", "area", "FWI"]
+num_vars = ["X", "Y", "FFMC", "DMC", "DC", "ISI", "BUI", "temp", "RH", "wind", "rain", "area", "log_area", "FWI"]
 cat_vars = ["month", "day", "season", "danger_level", "level_description"]
 
 # 📌 **1. Visualisation des variables numériques**
@@ -469,8 +485,8 @@ print(f"Les graphiques sont enregistrés dans le dossier : {save_dir}")
 # Affichage de plusieurs courbes sur une même page
 
 # Création du répertoire pour les graphiques
-save_dir = "analyse_distrib_univariee_subplots"
-os.makedirs(save_dir, exist_ok=True)
+#save_dir = "analyse_distrib_univariee_subplots"
+#os.makedirs(save_dir, exist_ok=True)
 
 # Configuration du style des graphes
 sns.set_style("whitegrid")
@@ -526,8 +542,8 @@ plt.close()
 print(f"Les graphiques sont enregistrés dans le dossier : {save_dir}")
 
 # 📁 Création du répertoire pour sauvegarder les graphiques
-save_dir = "analyse_distrib_univariee_area"
-os.makedirs(save_dir, exist_ok=True)
+#save_dir = "analyse_distrib_univariee_area"
+#os.makedirs(save_dir, exist_ok=True)
 
 # 📊 Comptage des valeurs où area = 0 et area > 0
 df_count = pd.DataFrame({
@@ -568,7 +584,7 @@ plots_groups = {
     "X_Y": ["X", "Y"],
     "FFMC_DMC_DC_ISI_BUI_FWI": ["FFMC", "DMC", "DC", "ISI", "BUI", "FWI"],
     "Temp_RH_Wind_Rain": ["temp", "RH", "wind", "rain"],
-    "Area": ["area"]
+    "Area": ["area", "log_area"]
 }
 
 # 📄 Création du fichier PDF
@@ -647,6 +663,7 @@ for col in df_cleaned.select_dtypes(include=[np.number]).columns:
     statist = {
         "Moyenne": np.mean(df_cleaned[col]),
         "Médiane": np.median(df_cleaned[col]),
+        "Variance": np.var(df_cleaned[col]),
         "Écart type": np.std(df_cleaned[col]),
         "Minimum": np.min(df_cleaned[col]),
         "Q1 (25%)": Q1,
@@ -762,7 +779,6 @@ plt.savefig(f"{save_dir}/frequence_incendies_par_mois.png")
 plt.savefig(f"{save_dir}/frequence_incendies_par_mois.pdf")
 plt.close()
 
-
 # Visualisation de la fréquence des incendies par saison
 # Comptage du nombre d'incendies par saison
 season_counts = df_area_non_0['season'].value_counts().reindex(['Hiver', 'Printemps', 'Été', 'Automne'])
@@ -784,7 +800,6 @@ plt.savefig(season_freq_pdf)
 plt.close()
 
 print("Le graphique de la fréquence des incendies par saison a été enregistré dans 'analyses_bivariees'.")
-
 
 # Visualisation de la surface brûlée en fonction des coordonnées X et Y
 
@@ -890,7 +905,174 @@ plt.savefig(f"{save_dir}/surface_brulee_vs_temperature.png")
 plt.savefig(f"{save_dir}/surface_brulee_vs_temperature.pdf")
 plt.close()
 
-## Analyses multivariées
+# Visualistation avec axe secondaire log area
+plt.figure(figsize=(10, 6))
+
+# Axe principal : area vs temperature
+ax1 = sns.scatterplot(data=df_area_non_0, x='temp', y='area',
+                      alpha=0.6, edgecolor=None, color="royalblue", label="Surface Brûlée (ha)")
+
+# Création d'un axe secondaire
+ax2 = ax1.twinx()
+sns.scatterplot(data=df_area_non_0, x='temp', y='log_area',
+                alpha=0.6, edgecolor=None, color="darkorange", label="log(Surface Brûlée)")
+
+# Titres et labels
+ax1.set_xlabel("Temp (°C)")
+ax1.set_ylabel("Surface Brûlée (ha)", color="royalblue")
+ax2.set_ylabel("log(Surface Brûlée)", color="darkorange")
+
+# Ajout d'une grille et d'un titre
+plt.title("Surface Brûlée et log(Surface Brûlée) en Fonction de la Température")
+ax1.grid(True, linestyle="--", alpha=0.5)
+
+# 📂 Sauvegarde du graphique
+plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_temperature.png")
+plt.savefig(f"{save_dir}/surface_brulee_etsurfacelog_vs_temperature.pdf")
+plt.close()
+
+# Visualiser la surface brûlée en fonction de l'humidité relative
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=df_area_non_0, x='RH', y='area', alpha=0.6, edgecolor=None, color="royalblue")
+plt.title("Surface Brûlée en Fonction de l'humidité relative")
+plt.xlabel("RH (%)")
+plt.ylabel("Surface Brûlée (ha)")
+plt.grid(True)
+plt.tight_layout()
+
+# 📂 Sauvegarde du graphique
+plt.savefig(f"{save_dir}/surface_brulee_vs_humidite_relative.png")
+plt.savefig(f"{save_dir}/surface_brulee_vs_humidite_relative.pdf")
+plt.close()
+
+# Visualistation avec axe secondaire log area
+plt.figure(figsize=(10, 6))
+
+# Axe principal : area vs humidité relative
+ax1 = sns.scatterplot(data=df_area_non_0, x='RH', y='area',
+                      alpha=0.6, edgecolor=None, color="royalblue", label="Surface Brûlée (ha)")
+
+# Création d'un axe secondaire
+ax2 = ax1.twinx()
+sns.scatterplot(data=df_area_non_0, x='RH', y='log_area',
+                alpha=0.6, edgecolor=None, color="darkorange", label="log(Surface Brûlée)")
+
+# Titres et labels
+ax1.set_xlabel("HR (%)")
+ax1.set_ylabel("Surface Brûlée (ha)", color="royalblue")
+ax2.set_ylabel("log(Surface Brûlée)", color="darkorange")
+
+# Ajout d'une grille et d'un titre
+plt.title("Surface Brûlée et log(Surface Brûlée) en Fonction de la Température")
+ax1.grid(True, linestyle="--", alpha=0.5)
+
+# 📂 Sauvegarde du graphique
+plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_hr.png")
+plt.savefig(f"{save_dir}/surface_brulee_etsurfacelog_vs_hr.pdf")
+plt.close()
+
+# Visualiser la surface brûlée en fonction du vent
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=df_area_non_0, x='wind', y='area', alpha=0.6, edgecolor=None, color="royalblue")
+plt.title("Surface Brûlée en Fonction du vent")
+plt.xlabel("vent (km/h)")
+plt.ylabel("Surface Brûlée (ha)")
+plt.grid(True)
+plt.tight_layout()
+
+# 📂 Sauvegarde du graphique
+plt.savefig(f"{save_dir}/surface_brulee_vs_vent.png")
+plt.savefig(f"{save_dir}/surface_brulee_vs_vent.pdf")
+plt.close()
+
+# Visualistation avec axe secondaire log area
+plt.figure(figsize=(10, 6))
+
+# Axe principal : area vs wind
+ax1 = sns.scatterplot(data=df_area_non_0, x='wind', y='area',
+                      alpha=0.6, edgecolor=None, color="royalblue", label="Surface Brûlée (ha)")
+
+# Création d'un axe secondaire
+ax2 = ax1.twinx()
+sns.scatterplot(data=df_area_non_0, x='wind', y='log_area',
+                alpha=0.6, edgecolor=None, color="darkorange", label="log(Surface Brûlée)")
+
+# Titres et labels
+ax1.set_xlabel("Vent (km/h)")
+ax1.set_ylabel("Surface Brûlée (ha)", color="royalblue")
+ax2.set_ylabel("log(Surface Brûlée)", color="darkorange")
+
+# Ajout d'une grille et d'un titre
+plt.title("Surface Brûlée et log(Surface Brûlée) en Fonction du Vent")
+ax1.grid(True, linestyle="--", alpha=0.5)
+
+# 📂 Sauvegarde du graphique
+plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_vent.png")
+plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_vent.pdf")
+plt.close()
+
+# Visualisation d'autres pairplots
+
+# 📌 Fonction de sauvegarde pour les heatmaps et pairplots
+def save_figure(fig, file_name, save_dir):
+    """Sauvegarde les figures sous format PNG et PDF."""
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)  # Créer le répertoire s'il n'existe pas
+
+    fig.savefig(os.path.join(save_dir, f"{file_name}.png"), bbox_inches='tight')
+    fig.savefig(os.path.join(save_dir, f"{file_name}.pdf"), bbox_inches='tight')
+    plt.close(fig)
+
+# Liste des colonnes numériques à analyser
+# 🟢 Définition des groupes de colonnes
+colonnes_normales = ['X', 'Y', 'BUI', 'temp']
+colonnes_asymetriques = ['FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind', 'rain']
+
+# Affichage du pairplot pour le cas où la surface brûlée est non nulle
+pairplot_burned = sns.pairplot(df_area_non_0[colonnes_normales+ colonnes_asymetriques + ['log_area']])
+plt.suptitle("Pairplot - Surface brûlée non nulle", y=1.02)
+save_figure(pairplot_burned.fig, "pairplot_burned", save_dir)
+
+# Affichage du pairplot pour le cas où la surface brûlée est nulle
+pairplot_no_burn = sns.pairplot(df_area_0[colonnes_normales + colonnes_asymetriques])
+plt.suptitle("Pairplot - Surface brûlée nulle", y=1.02)
+save_figure(pairplot_burned.fig, "pairplot_no_burn", save_dir)
+
+print("Les pairplots ont été générés et sauvegardés.")
+
+# Tracé des valeurs min, max et moyennes du FWI en fonction du mois
+
+df_grouped = df_cleaned.groupby('month')['FWI'].agg(['max', 'min', 'mean'])
+
+# Assurez-vous que les mois sont ordonnés
+df_grouped = df_grouped.sort_index()
+
+# Création de la figure et des axes
+plt.figure(figsize=(10, 6))
+
+# Tracer les trois courbes
+plt.plot(df_grouped.index, df_grouped['max'], label='FWI Max', color='red', marker='o')
+plt.plot(df_grouped.index, df_grouped['min'], label='FWI Min', color='blue', marker='o')
+plt.plot(df_grouped.index, df_grouped['mean'], label='FWI Moyen', color='green', marker='o')
+
+# Ajouter des labels, un titre et une légende
+plt.xlabel('Mois')
+plt.ylabel('FWI')
+plt.title('FWI Max, Min et Moyen en fonction du mois')
+
+# Réordonner les mois de 1 à 12 sur l'axe x
+mois_ordre = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+plt.xticks(ticks=df_grouped.index, labels=mois_ordre)
+
+# Ajouter la légende
+plt.legend()
+
+# Sauvegarder le graphique sous .png et .pdf
+plt.savefig(f'{save_dir}/fwi_courbes_en_fonction_mois_calendaire.png')
+plt.savefig(f'{save_dir}/fwi_courbes_en_fonction_mois_calendaire.pdf')
+plt.close()
+
+# Analyses multivariées
 
 # Définir un répertoire et le créer si non encore existant
 save_dir = "analyses_multivariées"
@@ -898,12 +1080,12 @@ os.makedirs(save_dir, exist_ok=True)
 
 # 🟢 Définition des groupes de colonnes
 colonnes_normales = ['X', 'Y', 'BUI', 'temp']
-colonnes_asymetriques = ['FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind', 'rain', 'area']
+colonnes_asymetriques = ['FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind', 'rain']
 
 # 📊 Matrices de corrélation
-correlation_pearson = df_cleaned[colonnes_normales].corr(method='pearson')  # (Normales vs Normales)
-correlation_spearman_asym = df_cleaned[colonnes_asymetriques].corr(method='spearman')  # (Asymétriques vs Asymétriques)
-correlation_spearman_mixed = df_cleaned[colonnes_normales + colonnes_asymetriques].corr(method='spearman')  # (Tout en Spearman)
+correlation_pearson = df_cleaned[['log_area']+colonnes_normales].corr(method='pearson')  # (Normales vs Normales)
+correlation_spearman_asym = df_cleaned[['log_area']+colonnes_asymetriques].corr(method='spearman')  # (Asymétriques vs Asymétriques)
+correlation_spearman_mixed = df_cleaned[['log_area']+colonnes_normales + colonnes_asymetriques].corr(method='spearman')  # (Tout en Spearman)
 
 # 📌 Affichage des matrices
 print("\n🔹 Matrice de Corrélation Pearson (Colonnes Normales) :\n", correlation_pearson)
@@ -976,11 +1158,11 @@ colonnes_normales_non_brule = [var for var, is_normal in normality_results["non_
 colonnes_asymetriques_non_brule = [var for var, is_normal in normality_results["non_brulé"].items() if not is_normal]
 
 # Création du répertoire de sauvegarde
-save_dir = "analyses_multivariees_surface_brulee_0_et_non_0"
+#save_dir = "analyses_multivariees_surface_brulee_0_et_non_0"
 
 # 📌 Corrélation Pearson pour les colonnes normales
 if colonnes_normales_brule:
-    pearson_corr_burned = df_area_non_0[colonnes_normales_brule].corr(method='pearson')
+    pearson_corr_burned = df_area_non_0[['log_area']+colonnes_normales_brule].corr(method='pearson')
     plt.figure(figsize=(10, 6))
     sns.heatmap(pearson_corr_burned, annot=True, cmap='coolwarm', vmin=-1, vmax=1, linewidths=0.5)
     plt.title("Heatmap Corrélation Pearson - Surface brûlée non nulle")
@@ -995,7 +1177,7 @@ if colonnes_normales_non_brule:
 
 # 📌 Corrélation Spearman pour les colonnes asymétriques
 if colonnes_asymetriques_brule:
-    spearman_corr_burned = df_area_non_0[colonnes_asymetriques_brule].corr(method='spearman')
+    spearman_corr_burned = df_area_non_0[['log_area']+colonnes_asymetriques_brule].corr(method='spearman')
     plt.figure(figsize=(10, 6))
     sns.heatmap(spearman_corr_burned, annot=True, cmap='coolwarm', vmin=-1, vmax=1, linewidths=0.5)
     plt.title("Heatmap Corrélation Spearman - Surface brûlée non nulle")
@@ -1010,7 +1192,7 @@ if colonnes_asymetriques_non_brule:
 
 print("Les heatmaps ont été générées et sauvegardées.")
 
-# Statistiques inférentielles
+# Statistiques inférentielles pour étudier l'influence des colonnes sur la surface brûlée
 
 # Définir un répertoire et le créer si non encore existant
 save_dir = "statistiques_inférentielles"
@@ -1097,3 +1279,318 @@ for var in variables:
 save_results_to_pdf(test_results, save_dir, file_name="results_stats_inferentielles_tmw.pdf")
 
 print("Les résultats ont été sauvegardés dans un fichier PDF.")
+
+# Test du Chi2
+#save_dir = "statistiques_inférentielles"
+#os.makedirs(save_dir, exist_ok=True)
+
+# 🔹 Convertir X et Y en catégories pour le test du Chi²
+df_area_non_0["X_cat"] = df_area_non_0["X"].astype("category")
+df_area_non_0["Y_cat"] = df_area_non_0["Y"].astype("category")
+
+# 🔹 Effectuer les tests du Chi² et stocker les résultats
+results = []
+
+for col in ["month", "day", "X_cat", "Y_cat"]:
+    contingency_table = pd.crosstab(df_area_non_0[col], df_area_non_0["area"] > 0)
+    chi2, p, dof, expected = chi2_contingency(contingency_table)
+
+    # Interprétation du résultat
+    if p < 0.05:
+        interpretation = f"Il y a une relation significative entre {col} et la présence d'un incendie (p = {p:.4f})."
+    else:
+        interpretation = f"Aucune relation significative détectée entre {col} et la présence d'un incendie (p = {p:.4f})."
+
+    # Stocker le résultat
+    results.append((col, chi2, p, dof, interpretation))
+
+# 🔹 Création du PDF
+pdf_path = os.path.join(save_dir, "chi2_results.pdf")
+
+with PdfPages(pdf_path) as pdf:
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.axis("off")
+
+    # Titre du rapport
+    text = "Test du Chi² : Analyse des relations entre variables catégoriques et présence d'incendie\n\n"
+    text += "\n".join([f"{col}: {interp}" for col, _, p, _, interp in results])
+
+    ax.text(0, 1, text, fontsize=12, va="top")
+
+    pdf.savefig(fig)
+    plt.close()
+
+print(f"Rapport du test du Chi² sauvegardé dans {pdf_path}")
+
+# maintenant regarder opportunité transformation log area, puis faire autres test statistiques inférentielles avec Python/R
+# puis faire si possible et autres analyses poussées pour arriver à établir relations avec paramètres météo
+# regarder les tests possibles pour savoir si relation non linéaire et l'établir
+#puis envisager de lancer des modèles types PCA, clustering, régression logistique, random forest et autres modèles avec R, Python Scikit learn et autres
+# ensuite regarder s'il faut enlever des outliers
+# regarder aussi établissement d'une échelle de risque avec les relations trouvées et FWI
+# puis faire l'injection d'une base de données propre avec données clés et trouvées et propres vers postgresql
+
+# ANOVA et test de Kruskal-Wallis pour comparer surfaces brulées selon catégories des différentes colonnes
+
+# Liste des variables continues (excluant area et log_area)
+variables_continues = ['X', 'Y', 'BUI', 'temp', 'FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind']
+
+# Dictionnaire pour stocker les résultats
+test_results = []
+
+# 📌 Catégorisation des variables continues en classes
+df_area_0_cat = df_area_0.copy()
+df_area_non_0_cat = df_area_non_0.copy()
+
+for var in variables_continues:
+    df_area_0_cat[var + "_cat"] = pd.qcut(df_area_0[var], q=3, labels=["Bas", "Moyen", "Élevé"])
+    df_area_non_0_cat[var + "_cat"] = pd.qcut(df_area_non_0[var], q=3, labels=["Bas", "Moyen", "Élevé"])
+
+# 📌 Séparation des variables normales et asymétriques via le test de Shapiro-Wilk
+variables_normales = []
+variables_asymetriques = []
+
+for var in variables_continues:
+    p_value_non_0 = stats.shapiro(df_area_non_0[var])[1] if len(df_area_non_0[var]) > 3 else 1
+    p_value_0 = stats.shapiro(df_area_0[var])[1] if len(df_area_0[var]) > 3 else 1
+
+    if p_value_non_0 > 0.05 and p_value_0 > 0.05:
+        variables_normales.append(var)
+    else:
+        variables_asymetriques.append(var)
+
+# 📌 ANOVA pour les variables normales
+for var in variables_normales:
+    f_stat, p_value = stats.f_oneway(df_area_non_0[var], df_area_0[var])
+    result = f"ANOVA pour {var} : F = {f_stat:.3f}, p-value = {p_value:.3f}"
+    result += "\n-> Différence significative entre les groupes." if p_value < 0.05 else "\n-> Aucune différence significative."
+    test_results.append(result)
+
+# 📌 Kruskal-Wallis pour les variables asymétriques
+for var in variables_asymetriques:
+    h_stat, p_value = stats.kruskal(df_area_non_0[var], df_area_0[var])
+    result = f"Kruskal-Wallis pour {var} : H = {h_stat:.3f}, p-value = {p_value:.3f}"
+    result += "\n-> Différence significative entre les groupes." if p_value < 0.05 else "\n-> Aucune différence significative."
+    test_results.append(result)
+
+# 📌 Sauvegarde des résultats dans un PDF
+pdf = FPDF()
+pdf.set_auto_page_break(auto=True, margin=15)
+pdf.add_page()
+pdf.set_font("Arial", size=12)
+
+pdf.cell(200, 10, "Résultats des tests ANOVA et Kruskal-Wallis", ln=True, align='C')
+pdf.ln(10)
+
+for res in test_results:
+    pdf.multi_cell(0, 10, res)
+    pdf.ln(5)
+
+pdf_file = os.path.join(save_dir, "anova_kruskal_results.pdf")
+pdf.output(pdf_file)
+
+print(f"Les résultats ont été sauvegardés dans {pdf_file}.")
+
+# Analyses statistiques complémentaires avec R
+
+# Activer la conversion entre pandas et R
+pandas2ri.activate()
+
+# Importer les packages R nécessaires
+base = importr('base')
+stats = importr('stats')
+ggplot2 = importr('ggplot2')
+cluster = importr('cluster')
+forecast = importr('forecast')
+
+# Convertir le dataframe pandas en dataframe R
+df_r = pandas2ri.py2rpy(df_cleaned)
+
+# 1. Test de normalité (Shapiro-Wilk et Kolmogorov-Smirnov) sur FWI
+print("\nTest de normalité en R :")
+shapiro_test = stats.shapiro_test(df_r.rx2("FWI"))
+ks_test = stats.ks_test(df_r.rx2("FWI"), "pnorm", mean=df_cleaned['FWI'].mean(), sd=df_cleaned['FWI'].std())
+print(f"Shapiro-Wilk p-value : {shapiro_test[1]}")
+print(f"Kolmogorov-Smirnov p-value : {ks_test[1]}")
+
+# 2. ANOVA (Analyse de la variance) pour tester les différences entre les saisons
+print("\nAnalyse de la variance (ANOVA) en R :")
+anova_model = stats.aov(r('FWI ~ season'), data=df_r)
+print(base.summary(anova_model))
+
+# 3. Régression non linéaire (polynomiale) entre FWI et Température
+print("\nRégression polynomiale en R :")
+poly_model = stats.lm(r('FWI ~ poly(temp, 2)'), data=df_r)
+print(base.summary(poly_model))
+
+# 4. Régression multiple entre Température et Humidité relative (avec la surface brûlée non nulle)
+df_r_area_non_0 = pandas2ri.py2rpy(df_area_non_0)
+
+# temp et rh sont les variables explicatives
+print("\nRégression multiple en R : Température et Humidité relative sur surface brûlée non nulle")
+
+# Passer l'objet à R pour la transformation et le modèle
+#r('df_r_area_non_0 <- ' + str(df_r_area_non_0))  # Importer correctement le DataFrame dans R
+
+# Transformer 'RH' en log(RH) car distribution asymétrique
+#r('df_r_area_non_0$log_RH <- log(df_r_area_non_0$RH)')
+
+# Créer le modèle de régression multiple
+lm_model_rh_temp = r.lm('log_area ~ temp + RH', data=df_r_area_non_0)
+
+# Afficher le résumé du modèle
+#print(r.summary(lm_model_rh_temp))
+
+# Résumé du modèle
+print(base.summary(lm_model_rh_temp))
+
+# Régression multiple entre BUI et Température comme variables explicatives pour prédire la surface brûlée
+print("\nRégression multiple en R : BUI et Température sur surface brûlée")
+
+# Création du modèle de régression multiple
+lm_model_temp_bui = r.lm('log_area ~ temp + BUI', data=df_r_area_non_0)
+
+# Résumé du modèle
+print(base.summary(lm_model_temp_bui))
+
+
+""""# 4. Clustering hiérarchique pour regrouper les jours selon leurs FWI et conditions
+print("\nClustering hiérarchique en R :")
+clustering_model = cluster.hclust(stats.dist(df_r.rx2("FWI")), method="ward.D2")
+r("plot")(clustering_model, main="Clustering hiérarchique des FWI", sub="", xlab="Jours")
+
+# 5. Résultat du clustering
+cluster_assignments = r.cutree(clustering_model, k=3)
+print("Cluster assignments :", cluster_assignments)"""
+
+# 4 Création et Alimentation de la Base de données traitée en utilisant PostGreSQL depuis Python
+
+# Rappel des informations sur le dataframe traité à l'étape 2
+print("Rappel des informations sur le dataframe df_cleaned")
+print(df_cleaned.info())
+
+# Convertir la colonne 'season' en chaînes de caractères
+df_cleaned['day'] = df_cleaned['day'].astype(str)
+df_cleaned['month'] = df_cleaned['month'].astype(str)
+df_cleaned['season'] = df_cleaned['season'].astype(str)
+df_cleaned['danger_level'] = df_cleaned['danger_level'].astype(str)
+df_cleaned['level_description'] = df_cleaned['level_description'].astype(str)
+
+# Connexion à PostgreSQL (connexion à la base par défaut 'postgres' pour créer une nouvelle base)
+def create_database(database_name, user, password, host, port):
+    connection = psycopg2.connect(
+        dbname='postgres',
+        user=user,
+        password=password,
+        host=host,
+        port=port
+    )
+    connection.autocommit = True
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
+        print(f"La base de données '{database_name}' a été créée avec succès.")
+    except psycopg2.errors.DuplicateDatabase:
+        print(f"La base de données '{database_name}' existe déjà.")
+
+    cursor.close()
+    connection.close()
+
+
+# Connexion à la base de données PostgreSQL avec encodage UTF-8
+def connect_to_database(database_name, user, password, host, port):
+    return psycopg2.connect(
+        dbname=database_name,
+        user=user,
+        password=password,
+        host=host,
+        port=port,
+        client_encoding='UTF8'  # Assurez-vous que l'encodage est UTF-8
+    )
+
+
+# Créer la table dans la base de données
+def create_table(cur):
+    table_creation_query = """
+    CREATE TABLE IF NOT EXISTS data_table_4 (
+        X INTEGER,
+        Y INTEGER,
+        month VARCHAR,
+        day VARCHAR,
+        FFMC FLOAT,
+        DMC FLOAT,
+        DC FLOAT,
+        ISI FLOAT,
+        temp FLOAT,
+        RH INTEGER,
+        wind FLOAT,
+        rain FLOAT,
+        area FLOAT,
+        season VARCHAR,
+        BUI FLOAT,
+        FWI FLOAT,
+        danger_level VARCHAR,
+        level_description VARCHAR,
+        log_area FLOAT
+    );
+    """
+    cur.execute(table_creation_query)
+
+#PRIMARY KEY (X, Y, month, day)
+
+# Insérer les données du DataFrame dans la table
+def insert_data_from_dataframe(cur, df):
+    # Convertir le DataFrame en une liste de tuples
+    data_tuples = [tuple(row) for row in df[['X', 'Y', 'month', 'day', 'FFMC', 'DMC', 'DC', 'ISI',
+                                             'temp', 'RH', 'wind', 'rain', 'area', 'season',
+                                             'BUI', 'FWI', 'danger_level', 'level_description',
+                                             'log_area']].values]
+
+    insert_query = """
+    INSERT INTO data_table_4 (
+        X, Y, month, day, FFMC, DMC, DC, ISI, temp, RH, wind, rain, area,
+        season, BUI, FWI, danger_level, level_description, log_area
+    ) VALUES %s;
+    """
+
+    # Insertion des données en une seule requête
+    execute_values(cur, insert_query, data_tuples)
+
+
+# Paramètres de connexion
+database_name = "viken_db_4"  # Nom de votre base de données
+user = "postgres"  # Votre utilisateur PostgreSQL
+password = "formationviken"  # Votre mot de passe PostgreSQL
+host = "localhost"  # Hôte PostgreSQL (ici localhost)
+port = "5432"  # Port PostgreSQL
+
+# Créer la base de données et insérer les données
+try:
+    # 1. Créer la base de données si elle n'existe pas
+    create_database(database_name, user, password, host, port)
+
+    # 2. Connecter à la base de données nouvellement créée
+    conn = connect_to_database(database_name, user, password, host, port)
+    cur = conn.cursor()
+
+    # 3. Créer la table si elle n'existe pas
+    create_table(cur)
+
+    # 4. Insérer les données depuis le DataFrame
+    insert_data_from_dataframe(cur, df_cleaned)
+
+    # Commit des modifications
+    conn.commit()
+
+    print("Données insérées avec succès.")
+
+except Exception as e:
+    print(f"Erreur d'exécution : {e}")
+
+finally:
+    # Fermer la connexion et le curseur
+    if cur:
+        cur.close()
+    if conn:
+        conn.close()
