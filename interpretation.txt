@@ -74,3 +74,184 @@ Exploration des interactions : Tu pourrais explorer des interactions entre ces v
 Modélisation plus poussée : Une approche comme la régression logistique ou un modèle de machine learning pourrait permettre d'examiner comment plusieurs variables interagissent ensemble pour prédire le risque d'incendie, plutôt que de tester chaque variable indépendamment.
 
 En résumé, pour BUI et temp, tu as trouvé que ces variables sont significativement liées au fait qu'une surface soit brûlée ou non, tandis que pour d'autres variables, comme le vent ou l'humidité, il n'y a pas de relation évidente dans ton analyse. Cela guide l'interprétation de ton étude : certaines variables jouent un rôle plus direct dans la dynamique des incendies que d'autres.
+
+
+Voici l'interprétation détaillée des résultats fournis :
+
+1. **Test de normalité (Shapiro-Wilk et Kolmogorov-Smirnov) sur FWI :
+Shapiro-Wilk Test :
+p-value : [7.4861474e-09]
+L'hypothèse nulle du test de Shapiro-Wilk est que les données suivent une distribution normale. Ici, la p-value est extrêmement faible (bien inférieure à 0.05), ce qui nous permet de rejeter l'hypothèse nulle.
+Conclusion : Les données ne suivent pas une distribution normale.
+Kolmogorov-Smirnov Test :
+p-value : [1.21323749e-05]
+Le test de Kolmogorov-Smirnov compare la distribution des données à une distribution normale (avec les paramètres de la moyenne et de l'écart-type de la série). Ici, la p-value est également très faible (inférieure à 0.05), ce qui mène à rejeter l'hypothèse nulle de normalité.
+Conclusion : Les données ne suivent pas une distribution normale selon le test KS aussi.
+Résumé des tests de normalité : Les deux tests (Shapiro-Wilk et Kolmogorov-Smirnov) montrent que FWI ne suit pas une distribution normale, ce qui signifie que vous ne pouvez pas utiliser des tests paramétriques comme le test t de Student sans modification (par exemple, transformation de données) si vous souhaitez comparer les groupes.
+
+2. Analyse de la variance (ANOVA) sur FWI selon les saisons :
+Résumé de l'ANOVA :
+Df : Les degrés de liberté. Ici, il y a 3 degrés de liberté pour le facteur season et 509 pour les résidus.
+Sum Sq (Somme des carrés) : Cela mesure la variabilité expliquée par chaque source de variation. La somme des carrés pour season est de 6338, ce qui montre que les saisons expliquent une grande partie de la variabilité de FWI.
+Mean Sq (Moyenne des carrés) : Cela correspond à la somme des carrés divisée par les degrés de liberté. Pour season, la moyenne des carrés est de 2112, ce qui est une mesure de la variabilité moyenne expliquée par les saisons.
+F value : La statistique F est le ratio de la variance expliquée par la saison (Mean Sq) à la variance des résidus. Ici, la valeur F est de 234.7, ce qui est très élevé, suggérant que la saison a un impact significatif sur la variabilité de FWI.
+Pr(>F) (p-value) : La p-value associée à la statistique F teste l'hypothèse nulle selon laquelle les moyennes de FWI sont égales entre les différentes saisons. Ici, la p-value est inférieure à 2e-16, ce qui est extrêmement faible et indique que la différence entre les saisons est hautement significative.
+Conclusion de l'ANOVA :
+
+H0 (hypothèse nulle) : Il n'y a pas de différence significative entre les moyennes de FWI dans les différentes saisons.
+H1 (hypothèse alternative) : Il existe une différence significative entre les moyennes de FWI dans les différentes saisons.
+Avec une p-value très inférieure à 0.05, nous rejetons l'hypothèse nulle et concluons qu'il existe des différences significatives entre les saisons concernant le FWI.
+
+Interprétation globale :
+Non normalité des données : Les résultats des tests de normalité indiquent que FWI ne suit pas une distribution normale. Cela suggère que les tests paramétriques (comme le t-test ou ANOVA sur les données non transformées) doivent être utilisés avec précaution. Si vous souhaitez utiliser des tests paramétriques, une transformation des données pourrait être envisagée.
+
+Différences significatives entre saisons : L'ANOVA montre que FWI varie de manière significative selon les saisons. Cela signifie que les saisons influencent de manière importante le FWI et que vous pourriez vouloir étudier plus en détail quelles saisons sont associées à des niveaux plus élevés ou plus faibles de FWI.
+
+Pour une analyse plus approfondie, vous pourriez :
+
+Effectuer des tests post-hoc pour déterminer précisément quelles saisons diffèrent les unes des autres.
+Utiliser des tests non paramétriques (comme le test de Kruskal-Wallis) si vous souhaitez éviter les hypothèses de normalité.
+
+
+
+
+3. Régression non linéaire (polynomiale) entre FWI et Température :
+La régression polynomiale permet de modéliser une relation non linéaire entre FWI et Température.
+
+Résultats de la régression polynomiale (poly(temp, 2)) :
+Le modèle FWI ~ poly(temp, 2) signifie que vous ajustez un polynôme de degré 2 (c'est-à-dire une parabole) entre FWI et temp.
+Les coefficients de cette régression sont les termes de l'équation polynomiale, et la p-value associée indique la significativité des coefficients.
+Interprétation des coefficients :
+Intercept (constante) : L'intercept (10.8560) représente la valeur estimée de FWI lorsque la température est nulle.
+poly(temp, 2)1 : Ce coefficient (62.2579) est le coefficient associé au premier terme du polynôme (température au carré), et il est significatif avec une p-value inférieure à 2e-16 (très faible), ce qui signifie que ce terme est important dans le modèle.
+poly(temp, 2)2 : Ce coefficient (-8.9570) est associé au deuxième terme du polynôme (température). La p-value de 0.0157 indique qu'il est aussi significatif (moins significatif que le premier terme, mais toujours pertinent pour le modèle).
+Autres informations importantes :
+R-squared (0.3623) : Cela indique que 36.23% de la variance de FWI peut être expliquée par la température et son effet quadratique dans ce modèle polynomiale. C'est un modèle modéré, car il ne capture pas toute la variance.
+Adjusted R-squared (0.3598) : Cette valeur prend en compte le nombre de variables dans le modèle. Elle est légèrement inférieure au R-squared, ce qui est normal.
+F-statistic (144.9) : Cette statistique test la significativité globale du modèle. Une valeur élevée indique que le modèle est globalement significatif.
+p-value (< 2.2e-16) : La p-value associée à l'ensemble du modèle est extrêmement faible, ce qui indique que le modèle est hautement significatif.
+Résumé des résultats :
+Normalité de FWI : La normalité de FWI est testée, et selon les p-values, vous pouvez conclure si les données sont normales ou non (en fonction des résultats des tests de normalité).
+Différences entre saisons : L'ANOVA montre si FWI varie de manière significative d'une saison à l'autre. Une p-value faible indique des différences significatives.
+Relation non linéaire entre Température et FWI : La régression polynomiale montre que la relation entre température et FWI est significative, avec un modèle qui explique une partie de la variance (R² = 36.23%).
+En conclusion, FWI varie significativement selon les saisons, et il existe une relation non linéaire entre la température et FWI, avec une part importante de variance expliquée par ce modèle polynomial.
+
+Voici l'interprétation détaillée des résultats que vous avez obtenus pour la régression multiple avec Température et Humidité relative (RH) sur la surface brûlée non nulle.
+
+1. Résidus :
+Les valeurs des résidus montrent l'écart entre les valeurs observées et les valeurs prédites par votre modèle. Les résidus sont importants pour évaluer la qualité de l'ajustement de votre modèle.
+
+Les statistiques des résidus sont :
+
+Min (minimum) : -2.0067
+1Q (1er quartile) : -0.9366
+Median : -0.1495
+3Q (3e quartile) : 0.6256
+Max (maximum) : 4.8152
+Cela signifie que la différence entre les valeurs observées et les valeurs prédites varie de -2.0067 à 4.8152, et que la médiane est proche de zéro, indiquant qu'en moyenne, les résidus sont assez proches de zéro. Cependant, l'écart entre les valeurs observées et les valeurs prédites est assez large.
+
+2. Coefficients :
+Les coefficients représentent l'impact de chaque variable indépendante (ici Température et Humidité relative) sur la variable dépendante (ici surface brûlée). Les coefficients sont associés à un test statistique pour vérifier leur signification.
+
+Intercept :
+Estimate : 2.609777
+Std. Error : 0.470046
+t value : 5.552
+Pr(>|t|) : 6.83e-08 ***
+L'intercept (ou constante) est 2.609777. Cela signifie que, lorsque temp et RH sont égales à zéro, la valeur de la surface brûlée non nulle serait de 2.609777.
+
+Le p-value (Pr(>|t|)) est 6.83e-08, ce qui est largement inférieur à 0.05, indiquant que l'intercept est hautement significatif.
+Température (temp) :
+Estimate : -0.009785
+Std. Error : 0.014350
+t value : -0.682
+Pr(>|t|) : 0.496
+Le coefficient de Température est -0.009785. Cela signifie qu'une augmentation d'une unité de température entraînerait une réduction de la surface brûlée non nulle de 0.009785. Cependant, ce coefficient n'est pas significatif, car le p-value est 0.496, bien supérieur à 0.05. Cela signifie que Température n'a pas d'effet statistiquement significatif sur la surface brûlée dans ce modèle.
+
+Humidité relative (RH) :
+Estimate : -0.006805
+Std. Error : 0.005892
+t value : -1.155
+Pr(>|t|) : 0.249
+Le coefficient de RH est -0.006805. Cela signifie qu'une augmentation d'une unité de l'humidité relative entraînerait une réduction de 0.006805 de la surface brûlée non nulle. Comme pour Température, ce coefficient n'est pas significatif car le p-value est 0.249, ce qui est aussi bien supérieur à 0.05. RH n'a donc pas d'effet statistiquement significatif sur la surface brûlée dans ce modèle.
+
+3. Signification globale du modèle :
+Residual standard error : 1.259 sur 266 degrés de liberté
+
+Cela donne une estimation de l'écart type des résidus, c'est-à-dire combien les valeurs prédites s'écartent en moyenne des valeurs réelles. Un petit écart type indique un bon ajustement du modèle.
+Multiple R-squared : 0.005043
+
+L'indicateur R-squared (R²) mesure la proportion de la variance dans la variable dépendante (surface brûlée) qui est expliquée par le modèle. Ici, R² = 0.005043, ce qui est très faible, indiquant que le modèle n'explique pratiquement aucune des variations de la surface brûlée. Cela signifie que les variables Température et Humidité relative sont des prédicteurs faibles de la surface brûlée non nulle dans ce modèle.
+Adjusted R-squared : -0.002438
+
+R² ajusté est une version du R² qui tient compte du nombre de variables dans le modèle. Ici, il est négatif, ce qui suggère que le modèle est même moins bon qu'un modèle qui n'essaierait pas d'expliquer les données (par exemple, en prédisant la moyenne pour chaque observation). Cela indique que le modèle ne s'ajuste pas bien aux données.
+F-statistic : 0.6741 sur 2 et 266 degrés de liberté
+
+F-statistic teste si au moins une des variables indépendantes dans le modèle a un effet significatif sur la variable dépendante. Ici, le p-value associé à F-statistic est 0.5105, ce qui est bien supérieur à 0.05, indiquant que le modèle global n'est pas significatif. Cela suggère que Température et Humidité relative ne sont pas de bons prédicteurs de la surface brûlée non nulle.
+Conclusion :
+Le modèle de régression multiple entre Température et Humidité relative sur la surface brûlée non nulle montre que :
+
+L'intercept est significatif, mais les variables explicatives (Température et Humidité relative) ne sont pas significatives.
+Le modèle a un faible pouvoir explicatif (très faible R²), ce qui indique que les variables sélectionnées n'expliquent que très peu la variabilité de la surface brûlée non nulle.
+Les p-values des variables explicatives sont élevées, ce qui signifie que ni Température ni Humidité relative n'ont d'impact statistiquement significatif sur la surface brûlée non nulle dans ce modèle.
+En résumé, ce modèle ne semble pas être une bonne représentation des relations entre les variables et la surface brûlée non nulle, et d'autres variables ou transformations pourraient être nécessaires pour améliorer l'ajustement.
+
+
+Interprétation du Résultat de la Régression Multiple avec BUI et Température :
+1. Résumé des Résidus :
+Les résidus sont la différence entre les valeurs observées de la variable dépendante (ici, la surface brûlée) et les valeurs prédites par le modèle. Voici ce que chaque mesure des résidus signifie :
+
+Min : Le plus petit résidu observé (-2.0487).
+1Q (Premier quartile) : Le résidu à 25% des observations (-0.9939).
+Median : La médiane des résidus (-0.1652), qui est proche de zéro, indiquant que le modèle n'est pas biaisé.
+3Q (Troisième quartile) : Le résidu à 75% des observations (0.6531).
+Max : Le plus grand résidu observé (4.8944). Les résidus devraient idéalement être répartis autour de zéro, ce qui semble être le cas ici (la médiane des résidus est proche de zéro).
+2. Coefficients :
+Les coefficients montrent l'impact de chaque variable explicative sur la variable dépendante surface brûlée.
+
+(Intercept) :
+
+Estimation : 2.1285098
+Cela signifie que si les deux variables explicatives (Température et BUI) sont égales à zéro, la surface brûlée prédite serait 2.1285098. C'est la valeur de base ou le point de départ pour les prédictions.
+p-value :
+4.45
+×
+10
+−
+15
+4.45×10
+−15
+ , ce qui est très significatif (beaucoup plus petit que 0.05). Cela signifie que l'intercept est statistiquement significatif.
+Température (temp) :
+
+Estimation : -0.0062390
+Cela indique que pour chaque augmentation de 1 unité de température, la surface brûlée diminue de 0.006239 unités, mais cela n’est pas significatif dans le modèle.
+p-value : 0.676, ce qui est bien supérieur à 0.05, ce qui signifie que Température n'a pas d'effet statistiquement significatif sur la surface brûlée dans ce modèle.
+BUI :
+
+Estimation : 0.0007733
+Cela signifie qu'une augmentation de 1 unité de BUI est associée à une augmentation de 0.0007733 unités de surface brûlée.
+p-value : 0.566, ce qui est également supérieur à 0.05. Cela suggère que BUI n'a pas un effet statistiquement significatif sur la surface brûlée dans ce modèle.
+3. Analyse de la qualité du modèle :
+Residual standard error : 1.261
+
+Cela mesure la dispersion des résidus autour de la ligne de régression. Un petit résidu standard error signifie que le modèle a bien ajusté les données. Ici, la valeur semble raisonnable, mais cela dépend du contexte spécifique du modèle et des données.
+Multiple R-squared : 0.001295
+
+Cela montre la proportion de la variance de la surface brûlée qui est expliquée par les variables explicatives Température et BUI. Un R² proche de 0 signifie que le modèle explique très peu de variance dans les données. Ici, il est très faible (proche de zéro), ce qui suggère que Température et BUI ne sont pas de bons prédicteurs de la surface brûlée dans ce modèle.
+Adjusted R-squared : -0.006214
+
+L'Adjusted R² prend en compte le nombre de variables dans le modèle et ajuste l'R² en conséquence. Si l'Adjusted R² est négatif, cela suggère que le modèle est probablement inadapté et que les variables explicatives ne sont pas pertinentes pour prédire la variable cible. Ici, la valeur est négative, ce qui indique que l'ajout de ces variables n'améliore pas du tout le modèle.
+F-statistic : 0.1725, p-value : 0.8417
+
+Le test F permet de tester la validité globale du modèle. Une p-value très élevée (0.8417) montre que le modèle global n'est pas significatif et que les variables explicatives n'ont pas une influence significative sur la surface brûlée. En d'autres termes, ce modèle n'explique pas bien la variabilité de la surface brûlée.
+Conclusion :
+Le modèle de régression multiple avec Température et BUI ne semble pas être un bon modèle pour prédire la surface brûlée, car :
+
+Les p-values des coefficients pour Température et BUI sont supérieures à 0.05, ce qui signifie qu'ils n'ont pas d'impact significatif sur la surface brûlée.
+L'R² et l'Adjusted R² sont très faibles (proches de zéro ou négatifs), indiquant que les variables explicatives n'expliquent pratiquement pas la variabilité de la surface brûlée.
+La p-value du test F est également élevée (0.8417), ce qui suggère que le modèle global n'est pas significatif.
+Cela pourrait signifier que d'autres facteurs non inclus dans le modèle ont un effet significatif sur la surface brûlée ou que les données utilisées ne sont pas suffisantes ou bien adaptées pour ce modèle. Il peut être utile d'explorer d'autres variables ou de revoir le prétraitement des données pour améliorer le modèle.
+
+
+
