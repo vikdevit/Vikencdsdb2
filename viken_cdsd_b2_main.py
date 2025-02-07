@@ -14,6 +14,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+import rpy2.robjects as ro
 from rpy2.robjects import pandas2ri, r
 from rpy2.robjects.packages import importr
 #rpy2.robjects.r('install.packages("forecast")')
@@ -21,6 +22,10 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2 import OperationalError
 from psycopg2.extras import execute_values
+from IPython.display import display
+from PIL import Image
+
+
 
 # 1-Collecte, compréhension et audit de la qualité des données
 # Chargement des données dans un dataframe
@@ -1453,15 +1458,552 @@ lm_model_temp_bui = r.lm('log_area ~ temp + BUI', data=df_r_area_non_0)
 # Résumé du modèle
 print(base.summary(lm_model_temp_bui))
 
+# Test modèles
+# Random Forest
+print("=================Essai Tests modèles=======================")
 
-""""# 4. Clustering hiérarchique pour regrouper les jours selon leurs FWI et conditions
-print("\nClustering hiérarchique en R :")
-clustering_model = cluster.hclust(stats.dist(df_r.rx2("FWI")), method="ward.D2")
-r("plot")(clustering_model, main="Clustering hiérarchique des FWI", sub="", xlab="Jours")
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
 
-# 5. Résultat du clustering
-cluster_assignments = r.cutree(clustering_model, k=3)
-print("Cluster assignments :", cluster_assignments)"""
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['ISI', 'wind', 'FFMC']]
+
+# Vérifier les types de données
+print(df_selected.dtypes)
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+
+# Charger la bibliothèque randomForest en R
+randomForest = importr("randomForest")
+
+# Exécuter le Random Forest en R
+rf_model = ro.r('''
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    rf_model <- randomForest(ISI ~ wind + FFMC, data=df_r, ntree=500, importance=TRUE)
+    print(rf_model)
+    rf_model
+''')
+
+importance = ro.r('importance(rf_model)')
+print(importance)
+
+# Afficher la courbe directement dans Python
+ro.r('plot(rf_model)')
+
+# Définir un fichier de sortie pour le graphique
+file_path = "essairforestun.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(rf_model)  # Plot du modèle
+    dev.off()
+''')
+
+print("===========================================")
+# Essai de prediction avec random forest
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['ISI', 'wind', 'FFMC']]
+
+# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
+y_true = df_selected['ISI']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque randomForest en R
+randomForest = importr("randomForest")
+
+# Exécuter le Random Forest en R
+rf_model = ro.r('''
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    rf_model <- randomForest(ISI ~ wind + FFMC, data=df_r, ntree=500, importance=TRUE)
+    print(rf_model)
+    rf_model
+''')
+
+# Obtenir l'importance des variables
+importance = ro.r('importance(rf_model)')
+print(importance)
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(rf_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$ISI')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre isi_true et isi_pred en fonction de wind et ffmc", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "isi_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre isi_true et isi_pred en fonction de wind et ffmc", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+print("===========================================")
+# Essai de prediction avec random forest
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['FWI', 'temp', 'wind', 'RH']]
+
+# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
+y_true = df_selected['FWI']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque randomForest en R
+randomForest = importr("randomForest")
+
+# Exécuter le Random Forest en R
+rf_model = ro.r('''
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    rf_model <- randomForest(FWI ~ temp + wind + RH, data=df_r, ntree=500, importance=TRUE)
+    print(rf_model)
+    rf_model
+''')
+
+# Obtenir l'importance des variables
+importance = ro.r('importance(rf_model)')
+print(importance)
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(rf_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$FWI')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre fwi_true et fwi_pred en fonction de temp, wind et rh", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "fwi_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre fwi_true et fwi_pred en fonction de temp, winf et rh", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+print("===========================================")
+# Essai de prediction avec random forest
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['area', 'FFMC', 'ISI']]
+
+# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
+y_true = df_selected['area']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque randomForest en R
+randomForest = importr("randomForest")
+
+# Exécuter le Random Forest en R
+rf_model = ro.r('''
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    rf_model <- randomForest(area ~ FFMC + ISI, data=df_r, ntree=500, importance=TRUE)
+    print(rf_model)
+    rf_model
+''')
+
+# Obtenir l'importance des variables
+importance = ro.r('importance(rf_model)')
+print(importance)
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(rf_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$area')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred en fonction de FFMC et ISI", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "area_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred en fonction de FFMC et ISI", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+print("===========================================")
+# Essai de prediction avec random forest
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['area', 'DMC', 'DC']]
+
+# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
+y_true = df_selected['area']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque randomForest en R
+randomForest = importr("randomForest")
+
+# Exécuter le Random Forest en R
+rf_model = ro.r('''
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    rf_model <- randomForest(area ~ DMC + DC, data=df_r, ntree=500, importance=TRUE)
+    print(rf_model)
+    rf_model
+''')
+
+# Obtenir l'importance des variables
+importance = ro.r('importance(rf_model)')
+print(importance)
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(rf_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$area')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred en fonction de DMC et DC", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "area_2_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred en fonction de DMC et DC", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+
+print("===========================================")
+# Essai de prediction avec random forest
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['FFMC', 'temp', 'RH']]
+
+# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
+y_true = df_selected['FFMC']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque randomForest en R
+randomForest = importr("randomForest")
+
+# Exécuter le Random Forest en R
+rf_model = ro.r('''
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    rf_model <- randomForest(FFMC ~ temp + RH, data=df_r, ntree=500, importance=TRUE)
+    print(rf_model)
+    rf_model
+''')
+
+# Obtenir l'importance des variables
+importance = ro.r('importance(rf_model)')
+print(importance)
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(rf_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$FFMC')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre FFMC_true et FFMC_pred en fonction de temp et RH", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "FFMC_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre FFMC_true et FFMC_pred en fonction de temp et RH", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+print("===========================================")
+# Essai de prediction avec random forest
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['DC', 'wind', 'RH']]
+
+# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
+y_true = df_selected['DC']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque randomForest en R
+randomForest = importr("randomForest")
+
+# Exécuter le Random Forest en R
+rf_model = ro.r('''
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    rf_model <- randomForest(DC ~ wind + RH, data=df_r, ntree=500, importance=TRUE)
+    print(rf_model)
+    rf_model
+''')
+
+# Obtenir l'importance des variables
+importance = ro.r('importance(rf_model)')
+print(importance)
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(rf_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$DC')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre DC_true et DC_pred en fonction de wind et RH", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "DC_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre DC_true et DC_pred en fonction de wind et RH", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+# GAM
+print("===========================================")
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['area', 'DMC', 'DC']]
+
+# Ajouter la colonne des vraies valeurs 'area' dans le DataFrame
+y_true = df_selected['area']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque mgcv pour GAM en R
+mgcv = importr("mgcv")
+
+# Exécuter le modèle GAM en R
+gam_model = ro.r('''
+    library(mgcv)
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    gam_model <- gam(area ~ s(DMC) + s(DC), data=df_r, family=gaussian)
+    print(summary(gam_model))  # Afficher le résumé du modèle
+    gam_model
+''')
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(gam_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$area')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred avec GAM en fonction de DMC et DC", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "area_gam_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred avec GAM en fonction de DMC et DC", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+print("===========================================")
+# Activer la conversion automatique Pandas -> R DataFrame
+pandas2ri.activate()
+
+# Sélectionner uniquement les colonnes nécessaires
+df_selected = df_area_non_0[['log_area', 'DMC', 'DC']]
+
+# Ajouter la colonne des vraies valeurs 'area' dans le DataFrame
+y_true = df_selected['log_area']
+
+# Convertir en DataFrame R et assigner dans l'environnement R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
+
+# Charger la bibliothèque mgcv pour GAM en R
+mgcv = importr("mgcv")
+
+# Exécuter le modèle GAM en R
+gam_model = ro.r('''
+    library(mgcv)
+    set.seed(123)  # Fixer le seed pour la reproductibilité
+    gam_model <- gam(log_area ~ s(DMC) + s(DC), data=df_r, family=gaussian)
+    print(summary(gam_model))  # Afficher le résumé du modèle
+    gam_model
+''')
+
+# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+y_pred_r = ro.r('predict(gam_model, df_r)')
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
+y_true_r = ro.r('df_r$area')
+
+# Tracer le graphique directement en R
+ro.r('''
+    # Convertir les valeurs en R pour plot
+    y_true <- c({0})
+    y_pred <- c({1})
+
+    # Créer le graphique
+    plot(y_true, y_pred, main="Comparaison entre log_area_true et log_area_pred avec GAM en fonction de DMC et DC", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
+'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+
+# Sauvegarder le graphique dans un fichier PNG
+file_path = "log_area_gam_prediction_vs_true.png"
+
+# Sauvegarder la courbe dans un fichier PNG
+ro.r(f'''
+    png("{file_path}", width=800, height=600)
+    plot(y_true, y_pred, main="Comparaison entre log_area_true et log_area_pred avec GAM en fonction de DMC et DC", 
+         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+         pch=19, col='blue', cex=0.6)
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    dev.off()
+''')
+
+# continuer les modèles avec plus de variables et voir relations non linéaires
+# puis faire clustering et dendogramme
+
+
 
 # 4 Création et Alimentation de la Base de données traitée en utilisant PostGreSQL depuis Python
 
@@ -1559,7 +2101,7 @@ def insert_data_from_dataframe(cur, df):
 
 
 # Paramètres de connexion
-database_name = "viken_db_4"  # Nom de votre base de données
+database_name = "viken_db_5"  # Nom de votre base de données
 user = "postgres"  # Votre utilisateur PostgreSQL
 password = "formationviken"  # Votre mot de passe PostgreSQL
 host = "localhost"  # Hôte PostgreSQL (ici localhost)
@@ -1594,3 +2136,10 @@ finally:
         cur.close()
     if conn:
         conn.close()
+
+# Reste à faire  le 4/2/25
+# lancer les modélisation sous rpy2 voir fin chatgpt du 4/2/25 avec des séries de relations recherchées ex: isi etc. voir prépa données dictionaires de df relations rpy2/python
+# tester les modèles puis afficher les métriques dont roc curve avec rpy2/python (voir s'il faut avant standardisation/normalisation/ encodage/ retirer ou garder outlier)
+# enchaîner avec clustering hiérarchique et dendogramme rpy2/ Python puis afficher le dendogramme
+# restera ensuite à faire un modèle de prédiction feu / pas feu avec rpy2 et python
+# rebalayer le code pour améliorer visualisations et retirer ce qui est superflu et intégrer une gestion des outliers
