@@ -1481,14 +1481,30 @@ print(f"Shapiro-Wilk p-value : {shapiro_test[1]}")
 print(f"Kolmogorov-Smirnov p-value : {ks_test[1]}")
 
 # 2. ANOVA (Analyse de la variance) pour tester les différences entre les saisons
-print("\nAnalyse de la variance (ANOVA) en R :")
+print("\nAnalyse de la variance (ANOVA) en R entre FWI et season:")
 anova_model = stats.aov(r('FWI ~ season'), data=df_r)
 print(base.summary(anova_model))
+anova_summary = base.summary(anova_model)
+
+# Ouvrir un fichier texte pour sauvegarder les résultats
+with open("resultats_tests_R_normalite_ANOVA.txt", "w", encoding="utf-8") as file:
+    # Écrire les résultats du test de normalité (Shapiro-Wilk et Kolmogorov-Smirnov)
+    file.write("===== Test de normalité en R =====\n")
+    file.write(f"Shapiro-Wilk p-value : {shapiro_test[1]}\n")
+    file.write(f"Kolmogorov-Smirnov p-value : {ks_test[1]}\n")
+
+    # Écrire les résultats de l'ANOVA
+    file.write("\n===== Analyse de la variance (ANOVA) =====\n")
+    file.write(str(anova_summary))  # L'ANOVA génère un résumé qui peut être écrit directement en texte
+
+print("Les résultats ont été sauvegardés dans le fichier 'resultats_tests.txt'.")
 
 # 3. Régression non linéaire (polynomiale) entre FWI et Température
 print("\nRégression polynomiale en R :")
 poly_model = stats.lm(r('FWI ~ poly(temp, 2)'), data=df_r)
 print(base.summary(poly_model))
+poly_summary = base.summary(poly_model)
+
 
 # 4. Régression linéaire multiple entre Température et Humidité relative (avec la surface brûlée non nulle)
 df_r_area_non_0 = pandas2ri.py2rpy(df_area_non_0)
@@ -1510,6 +1526,7 @@ lm_model_rh_temp = r.lm('log_area ~ temp + RH', data=df_r_area_non_0)
 
 # Résumé du modèle
 print(base.summary(lm_model_rh_temp))
+lm_summary_rh_temp = base.summary(lm_model_rh_temp)
 
 # Régression linéaire multiple entre BUI et Température comme variables explicatives pour prédire la surface brûlée
 print("\nRégression multiple en R : BUI et Température sur surface brûlée")
@@ -1519,6 +1536,22 @@ lm_model_temp_bui = r.lm('log_area ~ temp + BUI', data=df_r_area_non_0)
 
 # Résumé du modèle
 print(base.summary(lm_model_temp_bui))
+lm_summary_temp_bui = base.summary(lm_model_temp_bui)
+
+# Sauvegarde des résultats dans un fichier texte
+with open("regressions_polynom_multiple_results.txt", "w", encoding="utf-8") as file:
+    # Régression polynomiale entre FWI et Température
+    file.write("\n===== Régression Polynomiale entre FWI et Température =====\n")
+    file.write(str(poly_summary))  # Résumé du modèle de régression polynomiale
+
+    # Régression multiple entre Température et Humidité relative sur surface brûlée non nulle
+    file.write(
+        "\n===== Régression Multiple entre Température et Humidité relative sur Surface Brûlée Non Nulle =====\n")
+    file.write(str(lm_summary_rh_temp))  # Résumé du modèle de régression multiple avec Température et Humidité relative
+
+    # Régression multiple entre BUI et Température pour prédire la surface brûlée
+    file.write("\n===== Régression Multiple entre BUI et Température sur Surface Brûlée =====\n")
+    file.write(str(lm_summary_temp_bui))  # Résumé du modèle de régression multiple avec BUI et Température
 
 # Test modèles
 # Random Forest
@@ -1551,6 +1584,24 @@ rf_model = ro.r('''
 
 importance = ro.r('importance(rf_model)')
 print(importance)
+
+# Convertir l'importance en dataframe R
+importance_r_df = ro.r['data.frame'](importance)
+
+# Convertir l'objet importance_r_df en un DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r_df)
+
+# Sauvegarde des résultats dans un fichier texte
+with open("ISI_tilde_wind_FFMC_random_forest_results.txt", "w", encoding="utf-8") as file:
+    # Modèle Random Forest
+    file.write("================= Modèle Random Forest =================\n")
+    file.write(str(rf_model))  # Résumé du modèle Random Forest
+    file.write("\n\n")
+
+    # Importance des variables
+    file.write("================= Importance des Variables =================\n")
+    file.write(importance_df.to_string())  # Importance des variables dans le modèle Random Forest
+
 
 # Afficher la courbe directement dans Python
 ro.r('plot(rf_model)')
@@ -1594,14 +1645,29 @@ rf_model = ro.r('''
 ''')
 
 # Obtenir l'importance des variables
-importance = ro.r('importance(rf_model)')
+importance_r = ro.r('importance(rf_model)')
 print(importance)
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+# Obtenir l'importance des variables sous forme de data.frame R
+importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
+
+
+# Convertir l'importance (qui est un R object) en DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r)
+
+# Obtenir les prédictions en R et les convertir en liste (non numpy)
 y_pred_r = ro.r('predict(rf_model, df_r)')
+y_pred_list = list(y_pred_r)  # Convertir en liste
+
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$ISI')
+
+# Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
+y_true_df = pd.DataFrame(y_true)
+y_true_df['Predictions'] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1617,7 +1683,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "isi_prediction_vs_true.png"
+file_path = "essai_random_forest_isi_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1628,6 +1694,14 @@ ro.r(f'''
     abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
     dev.off()
 ''')
+
+# Sauvegarder les résultats dans un fichier texte
+with open("essai_random_forest_results_et_pred_ISI_tilde_wind_FFMC.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest ISI tilde wind FFMC =================\n")
+    file.write("\nImportance des variables :\n")
+    file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
+    file.write("\n\n===== Prédictions du modèle =====\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
 print("===========================================")
 # Entraînement d'un model random forest pour prédire le FWI en fonction de temp, wind et rh , mesurer l'impact de chaque variable sur la prédiction,
@@ -1658,14 +1732,28 @@ rf_model = ro.r('''
 ''')
 
 # Obtenir l'importance des variables
-importance = ro.r('importance(rf_model)')
+importance_r = ro.r('importance(rf_model)')
 print(importance)
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+# Obtenir l'importance des variables sous forme de data.frame R
+importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
+
+# Convertir l'importance (qui est un R object) en DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r)
+
+# Obtenir les prédictions en R et les convertir en liste (non numpy)
 y_pred_r = ro.r('predict(rf_model, df_r)')
+y_pred_list = list(y_pred_r)  # Convertir en liste
+
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$FWI')
+
+# Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
+y_true_df = pd.DataFrame(y_true)
+y_true_df['Predictions'] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1681,7 +1769,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "fwi_prediction_vs_true.png"
+file_path = "essai_random_forest_fwi_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1692,6 +1780,16 @@ ro.r(f'''
     abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
     dev.off()
 ''')
+
+# Sauvegarder les résultats dans un fichier texte
+with open("essai_random_forest_results_et_pred_FWI_tilde_temp_wind_RH.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest FWI tilde temp wind RH =================\n")
+    file.write("\nImportance des variables :\n")
+    file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
+    file.write("\n\n===== Prédictions du modèle =====\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
+
+
 
 print("===========================================")
 # Entraînement d'un modèle random forest pour prédire la surface brûlée area en fonction de 'FFMC' et 'ISI',
@@ -1723,14 +1821,28 @@ rf_model = ro.r('''
 ''')
 
 # Obtenir l'importance des variables
-importance = ro.r('importance(rf_model)')
+importance_r = ro.r('importance(rf_model)')
 print(importance)
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+# Obtenir l'importance des variables sous forme de data.frame R
+importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
+
+# Convertir l'importance (qui est un R object) en DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r)
+
+# Obtenir les prédictions en R et les convertir en liste (non numpy)
 y_pred_r = ro.r('predict(rf_model, df_r)')
+y_pred_list = list(y_pred_r)  # Convertir en liste
+
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$area')
+
+# Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
+y_true_df = pd.DataFrame(y_true)
+y_true_df['Predictions'] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1746,7 +1858,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "area_prediction_vs_true.png"
+file_path = "essai_random_forest_area_tilde_FFMC_ISI_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1757,6 +1869,16 @@ ro.r(f'''
     abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
     dev.off()
 ''')
+
+# Sauvegarder les résultats dans un fichier texte
+with open("essai_random_forest_results_et_pred_area_tilde_FFMC_ISI.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest area tilde FFMC ISI =================\n")
+    file.write("\nImportance des variables :\n")
+    file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
+    file.write("\n\n===== Prédictions du modèle =====\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
+
+
 
 print("===========================================")
 # Entraînement d'un modèle random forest pour prédire la surface brûlée area en fonction de 'DMC' et 'DC',
@@ -1788,14 +1910,28 @@ rf_model = ro.r('''
 ''')
 
 # Obtenir l'importance des variables
-importance = ro.r('importance(rf_model)')
+importance_r = ro.r('importance(rf_model)')
 print(importance)
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+# Obtenir l'importance des variables sous forme de data.frame R
+importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
+
+# Convertir l'importance (qui est un R object) en DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r)
+
+# Obtenir les prédictions en R et les convertir en liste (non numpy)
 y_pred_r = ro.r('predict(rf_model, df_r)')
+y_pred_list = list(y_pred_r)  # Convertir en liste
+
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$area')
+
+# Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
+y_true_df = pd.DataFrame(y_true)
+y_true_df['Predictions'] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1811,7 +1947,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "area_2_prediction_vs_true.png"
+file_path = "area_DMC_DC_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1822,6 +1958,14 @@ ro.r(f'''
     abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
     dev.off()
 ''')
+
+# Sauvegarder les résultats dans un fichier texte
+with open("essai_random_forest_results_et_pred_area_tilde_DMC_DC.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest area tilde DMC DC =================\n")
+    file.write("\nImportance des variables :\n")
+    file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
+    file.write("\n\n===== Prédictions du modèle =====\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
 
 print("===========================================")
@@ -1854,14 +1998,28 @@ rf_model = ro.r('''
 ''')
 
 # Obtenir l'importance des variables
-importance = ro.r('importance(rf_model)')
+importance_r = ro.r('importance(rf_model)')
 print(importance)
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+# Obtenir l'importance des variables sous forme de data.frame R
+importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
+
+# Convertir l'importance (qui est un R object) en DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r)
+
+# Obtenir les prédictions en R et les convertir en liste (non numpy)
 y_pred_r = ro.r('predict(rf_model, df_r)')
+y_pred_list = list(y_pred_r)  # Convertir en liste
+
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$FFMC')
+
+# Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
+y_true_df = pd.DataFrame(y_true)
+y_true_df['Predictions'] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1877,7 +2035,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "FFMC_prediction_vs_true.png"
+file_path = "FFMC_tilde_temp_RH_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1888,6 +2046,14 @@ ro.r(f'''
     abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
     dev.off()
 ''')
+
+# Sauvegarder les résultats dans un fichier texte
+with open("essai_random_forest_results_et_pred_FFMC_tilde_temp_RH.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest FFMC tilde temp RH =================\n")
+    file.write("\nImportance des variables :\n")
+    file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
+    file.write("\n\n===== Prédictions du modèle =====\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
 print("===========================================")
 # Entraînement d'un modèle random forest pour prédire le DC en fonction de 'wind' et 'RH',
@@ -1919,14 +2085,28 @@ rf_model = ro.r('''
 ''')
 
 # Obtenir l'importance des variables
-importance = ro.r('importance(rf_model)')
+importance_r = ro.r('importance(rf_model)')
 print(importance)
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+# Obtenir l'importance des variables sous forme de data.frame R
+importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
+
+# Convertir l'importance (qui est un R object) en DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r)
+
+# Obtenir les prédictions en R et les convertir en liste (non numpy)
 y_pred_r = ro.r('predict(rf_model, df_r)')
+y_pred_list = list(y_pred_r)  # Convertir en liste
+
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$DC')
+
+# Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
+y_true_df = pd.DataFrame(y_true)
+y_true_df['Predictions'] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1942,7 +2122,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "DC_prediction_vs_true.png"
+file_path = "random_forest_DC_tilde_wind_RH_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1953,6 +2133,14 @@ ro.r(f'''
     abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
     dev.off()
 ''')
+
+# Sauvegarder les résultats dans un fichier texte
+with open("essai_random_forest_results_et_pred_DC_tilde_wind_RH.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest DC tilde wind RH =================\n")
+    file.write("\nImportance des variables :\n")
+    file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
+    file.write("\n\n===== Prédictions du modèle =====\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
 # Entraînement d'un modèle random forest pour prédire la surface brûlée (version transformation logarithmique) log_area  en fonction de 'temp', 'RH', 'wind', 'BUI', 'FWI',
 # 'ISI, 'DC'
@@ -1966,9 +2154,13 @@ pandas2ri.activate()
 # Sélectionner uniquement les colonnes nécessaires
 df_selected = df_area_non_0[['log_area', 'temp', 'RH', 'wind', 'BUI', 'FWI', 'ISI', 'DC']]
 
+# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
+y_true = df_selected['log_area']
+
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
 ro.globalenv["df_r"] = df_r
+ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
 
 # Charger la bibliothèque randomForest en R
 randomForest = importr("randomForest")
@@ -1982,15 +2174,29 @@ rf_model = ro.r('''
     rf_model
 ''')
 
-# Importance des variables
-importance = ro.r('importance(rf_model)')
+# Obtenir l'importance des variables
+importance_r = ro.r('importance(rf_model)')
 print(importance)
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
-y_pred_r = ro.r('predict(rf_model, df_r)')
+# Obtenir l'importance des variables sous forme de data.frame R
+importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
 
-# Obtenir les vraies valeurs (log_area) directement depuis df_r
+# Convertir l'importance (qui est un R object) en DataFrame pandas
+importance_df = pandas2ri.rpy2py(importance_r)
+
+# Obtenir les prédictions en R et les convertir en liste (non numpy)
+y_pred_r = ro.r('predict(rf_model, df_r)')
+y_pred_list = list(y_pred_r)  # Convertir en liste
+
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
+
+# Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$log_area')
+
+# Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
+y_true_df = pd.DataFrame(y_true)
+y_true_df['Predictions'] = y_pred_df
 
 # Tracer le graphique directement en R (valeurs prédites vs réelles)
 ro.r('''
@@ -2006,7 +2212,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "log_area_prediction_vs_true.png"
+file_path = "random_forest_log_area_tilde_meteo_indices_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -2018,110 +2224,122 @@ ro.r(f'''
     dev.off()
 ''')
 
+# Sauvegarder les résultats dans un fichier texte
+with open("essai_random_forest_results_et_pred_log_area_tilde_meteo_indices.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest log_area tilde meteo indices =================\n")
+    file.write("\nImportance des variables :\n")
+    file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
+    file.write("\n\n===== Prédictions du modèle =====\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
+
 # Régression GAM (modèle additif généralisé) pour prédire la surface brûlée area à partir de 'DMC' et 'DC' puis
 # courbe de comparaison entre valeur prédite et valeur réelle
 print("===========================================")
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
+# Chargerl es bibliothèques nécessaires
+mgcv = importr("mgcv")
+
 # Sélectionner uniquement les colonnes nécessaires
 df_selected = df_area_non_0[['area', 'DMC', 'DC']]
 
-# Ajouter la colonne des vraies valeurs 'area' dans le DataFrame
-y_true = df_selected['area']
-
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
-ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
-ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
-
-# Charger la bibliothèque mgcv pour GAM en R
-mgcv = importr("mgcv")
+ro.globalenv["df_r"] = df_r
 
 # Exécuter le modèle GAM en R
 gam_model = ro.r('''
-    library(mgcv)
     set.seed(123)  # Fixer le seed pour la reproductibilité
     gam_model <- gam(area ~ s(DMC) + s(DC), data=df_r, family=gaussian)
-    print(summary(gam_model))  # Afficher le résumé du modèle
     gam_model
 ''')
 
-# Obtenir les prédictions sur les données utilisées pour l'entraînement (en R)
+# Obtenir le résumé du modèle (coefficients, p-values, R², etc.)
+gam_summary = ro.r('summary(gam_model)')
+
+# Obtenir l'analyse de la variance (ANOVA) pour voir l'importance des variables
+anova_result = ro.r('anova(gam_model)')
+
+# Obtenir les prédictions en R
 y_pred_r = ro.r('predict(gam_model, df_r)')
 
-# Obtenir les vraies valeurs (y_true) directement depuis df_r
-y_true_r = ro.r('df_r$area')
+# Convertir les prédictions en DataFrame pandas
+y_pred_df = pd.DataFrame(list(y_pred_r), columns=['Predictions'])
 
-# Tracer le graphique directement en R
-ro.r('''
-    # Convertir les valeurs en R pour plot
-    y_true <- c({0})
-    y_pred <- c({1})
+# Obtenir les vraies valeurs (y_true) directement depuis df_selected
+y_true_df = df_selected[['area']].reset_index(drop=True)
+y_true_df['Predictions'] = y_pred_df  # Ajouter les prédictions
 
-    # Créer le graphique
-    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred avec GAM en fonction de DMC et DC", 
-         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
-         pch=19, col='blue', cex=0.6)
-    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x pour la comparaison
-'''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
+# Sauvegarder les résultats dans un fichier texte
+file_path_txt = "gam_results_predictions_area_tilde_DMC_DC.txt"
+with open(file_path_txt, "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle GAM area ~ DMC + DC =================\n\n")
+    file.write("=== Résumé du modèle GAM ===\n")
+    file.write(str(gam_summary) + "\n\n")
+    file.write("=== Analyse de la variance (ANOVA) ===\n")
+    file.write(str(anova_result) + "\n\n")
+    file.write("=== Prédictions du modèle ===\n")
+    file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions
 
-# Sauvegarder le graphique dans un fichier PNG
-file_path = "area_gam_prediction_vs_true.png"
+print(f"Résultats enregistrés dans {file_path_txt}")
 
-# Sauvegarder la courbe dans un fichier PNG
+# Tracer le graphique directement en R et l'enregistrer
+file_path_png = "gam_prediction_vs_true_area_tilde_DMC_DC.png"
 ro.r(f'''
-    png("{file_path}", width=800, height=600)
-    plot(y_true, y_pred, main="Comparaison entre area_true et area_pred avec GAM en fonction de DMC et DC", 
-         xlab="Valeurs réelles (y_true)", ylab="Valeurs prédites (y_pred)",
+    png("{file_path_png}", width=800, height=600)
+    plot(df_r$area, predict(gam_model, df_r), 
+         main="Comparaison entre area_true et area_pred avec GAM",
+         xlab="Valeurs réelles (area_true)", ylab="Valeurs prédites (area_pred)",
          pch=19, col='blue', cex=0.6)
-    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y=x
+    abline(a=0, b=1, col="red", lwd=2)  # Ajouter la ligne y = x pour la comparaison
     dev.off()
 ''')
 
-# continuer les modèles avec plus de variables et voir relations non linéaires
-# puis faire clustering et dendogramme
+print(f"Graphique enregistré sous {file_path_png}")
 
 print("============== Essai Clustering hiérarchique====================")
 # Activer la conversion Pandas -> R DataFrame
-pandas2ri.activate()
+#pandas2ri.activate()
 
 # Sélectionner les colonnes pertinentes du DataFrame
-df_selected = df_area_non_0[['temp', 'wind', 'RH', 'DC', 'DMC', 'ISI', 'BUI', 'FWI', 'FFMC', 'area']]
+#df_selected = df_area_non_0[['temp', 'wind', 'RH', 'DC', 'DMC', 'ISI', 'BUI', 'FWI', 'FFMC', 'area']]
 
 # Convertir le DataFrame Pandas en DataFrame R
-df_r = pandas2ri.py2rpy(df_selected)
+#df_r = pandas2ri.py2rpy(df_selected)
 
 # Normaliser les données
-ro.r('''
-  df_r_scaled <- scale(df_r)
-''')
+#ro.r('''
+#  df_r_scaled <- scale(df_r)
+#''')
 
 # Effectuer le clustering hiérarchique
-ro.r('''
-  dist_matrix <- dist(df_r_scaled)  # Calculer la matrice de distances
-  hc <- hclust(dist_matrix, method="ward.D2")  # Clustering hiérarchique avec méthode Ward
-''')
+#ro.r('''
+#  dist_matrix <- dist(df_r_scaled)  # Calculer la matrice de distances
+#  hc <- hclust(dist_matrix, method="ward.D2")  # Clustering hiérarchique avec méthode Ward
+#''')
 
 # Visualiser le dendrogramme
-ro.r('''
-  plot(hc, main="Dendrogramme - Clustering Hiérarchique", xlab="", sub="", cex=0.9)
-''')
+#ro.r('''
+#  plot(hc, main="Dendrogramme - Clustering Hiérarchique", xlab="", sub="", cex=0.9)
+#''')
 
-"""# Sauvegarder le dendrogramme en PNG
-save_dir = "analyses_bivariées"
-os.makedirs(save_dir, exist_ok=True)"""
+#Sauvegarder le dendrogramme en PNG
+#save_dir = "analyses_bivariées"
+#os.makedirs(save_dir, exist_ok=True)
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "dendrogramme_clustering.png"
+#file_path = "dendrogramme_clustering.png"
 
-ro.r(f'png("{file_path}", width=1500, height=1200)')
-ro.r('plot(hc, main="Dendrogramme - Clustering Hiérarchique", xlab="", sub="", cex=0.9)')
-ro.r('dev.off()')
+#ro.r(f'png("{file_path}", width=1500, height=1200)')
+#ro.r('plot(hc, main="Dendrogramme - Clustering Hiérarchique", xlab="", sub="", cex=0.9)')
+#ro.r('dev.off()')
 
-print(f"Le dendrogramme a été sauvegardé.")
+#print(f"Le dendrogramme a été sauvegardé.")
 
-graphics = importr('graphics')
+#graphics = importr('graphics')
+
+print("=================Clustering ward avec X,Y,ISI,FWI,area non nulle=========================")
 
 # Sélectionner les colonnes nécessaires
 df_selected = df_area_non_0[['X', 'Y', 'ISI', 'FWI', 'area']]
@@ -2151,7 +2369,7 @@ ro.r('''
 ''')
 
 # Sauvegarder le dendrogramme
-print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_2.png'.")
+print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_non_0_sanstempRHwind.png'.")
 
 # Visualiser les clusters avec un scatter plot
 ro.r('''
@@ -2179,7 +2397,7 @@ ro.r('''
         
 
     # Sauvegarder le scatter plot dans un fichier PNG
-    ggsave("visualisation_clusters_white.png", plot = p, width = 8, height = 6)
+    ggsave("visualisation_clusters_white_area_non_0_sanstempRHwind.png", plot = p, width = 8, height = 6)
 ''')
 
 # Message de confirmation pour la visualisation
@@ -2190,7 +2408,14 @@ ro.r('''
     # Statistiques descriptives pour chaque cluster
     summary_cluster <- by(df_r[, c("X", "Y", "ISI", "FWI", "area")], df_r$cluster, summary)
     print(summary_cluster)
+    # Récupérer les statistiques descriptives sous forme de texte
+    summary_cluster_text <- capture.output(summary_cluster)
 ''')
+# Récupérer les statistiques descriptives sous forme de texte
+summary_cluster_r = ro.r['summary_cluster_text']
+
+# Convertir les résultats en Python (ils sont maintenant sous forme de liste de chaînes de caractères)
+summary_cluster_list = list(summary_cluster_r)
 
 # Code pour calculer les moyennes des variables par cluster
 ro.r('''
@@ -2198,6 +2423,10 @@ ro.r('''
     mean_by_cluster <- aggregate(df_r[, c("X", "Y", "ISI", "FWI", "area")], by = list(cluster = df_r$cluster), FUN = mean)
     print(mean_by_cluster)
 ''')
+mean_by_cluster_r = ro.r['mean_by_cluster']
+
+# Convertir mean_by_cluster en dataframe pandas
+mean_by_cluster_df = pandas2ri.rpy2py(mean_by_cluster_r)
 
 # Code pour générer et sauvegarder les boxplots pour chaque variable
 # Code pour créer et sauvegarder les boxplots par cluster
@@ -2221,7 +2450,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot ISI
-    ggsave("boxplot_isi_by_cluster_white.png", plot = p1, width = 8, height = 6)
+    ggsave("boxplot_isi_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p1, width = 8, height = 6)
 
     # Boxplot pour FWI
     p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
@@ -2239,7 +2468,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot FWI
-    ggsave("boxplot_fwi_by_cluster_white.png", plot = p2, width = 8, height = 6)
+    ggsave("boxplot_fwi_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p2, width = 8, height = 6)
 
     # Boxplot pour Surface Brûlée (area)
     p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
@@ -2257,14 +2486,14 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot Surface Brûlée
-    ggsave("boxplot_area_by_cluster_white.png", plot = p3, width = 8, height = 6)
+    ggsave("boxplot_area_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p3, width = 8, height = 6)
 ''')
 
 # Message de confirmation
 print("Les boxplots ont été sauvegardés sous les noms suivants :")
-print("1. Boxplot ISI : boxplot_isi_by_cluster.png")
-print("2. Boxplot FWI : boxplot_fwi_by_cluster.png")
-print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster.png")
+print("1. Boxplot ISI : boxplot_isi_by_cluster_area_non_0_sanstempRHwind.png")
+print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_non_0_sanstempRHwind.png")
+print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_non_0_sanstempRHwind.png")
 
 # analyse des points du cluster 3
 ro.r('''
@@ -2274,9 +2503,594 @@ ro.r('''
     
     # Analyser les distances entre points
     dist_points <- dist(cluster_3_points[, c("X", "Y", "ISI", "FWI", "area")])
-    print(dist_points)
+    
+    # Convertir en matrice pour une meilleure gestion en Python
+    dist_points_matrix <- as.matrix(dist_points)
+    
+    # Convertir la matrice en dataframe (facilite la conversion en pandas)
+    dist_points_df <- as.data.frame(dist_points_matrix)
+    print(dist_points_df)
 ''')
-# reste à voir comment imprimer dans un fichier les résultats des modèles R s'affichant dans le terminal et rendre visible les moustaches des boxplots
+dist_points_r = ro.r['dist_points_df']
+
+# Convertir mean_by_cluster en dataframe pandas
+dist_points_df = pandas2ri.rpy2py(dist_points_r)
+
+# Sauvegarde des résultats dans un fichier texte
+with open("statistiques_par_cluster_area_non_0_sanstemprhwind.txt", "w", encoding="utf-8") as file:
+    file.write("===== Statistiques Descriptives par Cluster (surface brûlée non nulle, sans temp, RH et wind) =====\n")
+    file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
+    file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
+    file.write(mean_by_cluster_df.to_string())  # Écrire le tableau des moyennes
+    file.write("\n\n===== Distances entre les Points du Cluster 3 =====\n")
+    file.write(dist_points_df.to_string())  # Écrire les distances dans le fichier
+
+
+print("=================Clustering ward avec X,Y,ISI,FWI, temp, RH, wind, area non nulle =========================")
+
+# Sélectionner les colonnes nécessaires
+df_selected = df_area_non_0[['X', 'Y', 'ISI', 'FWI', 'temp', 'RH', 'wind', 'area']]
+
+# Convertir en DataFrame R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r
+
+# Clustering hiérarchique en R
+ro.r('''
+    # Normalisation des données
+    df_scaled <- scale(df_r)
+
+    # Clustering hiérarchique avec méthode de Ward
+    hc <- hclust(dist(df_scaled), method = "ward.D2")
+
+    # Couper l'arbre pour obtenir 3 clusters
+    clusters <- cutree(hc, k = 3)
+
+    # Ajouter les clusters au DataFrame
+    df_r$cluster <- as.factor(clusters)
+
+    # Tracer le dendrogramme et sauvegarder en fichier PNG
+    png("dendrogramme_clustering_areanon0_avecmeteo.png", width = 800, height = 600)
+    plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
+    dev.off()
+''')
+
+# Sauvegarder le dendrogramme
+print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_non_0_avecmeteo.png'.")
+
+# Visualiser les clusters avec un scatter plot
+ro.r('''
+
+    # Vérifier la distribution des clusters
+    print(table(df_r$cluster))
+
+    # Créer un graphique de dispersion des points avec leurs clusters
+    p <- ggplot(df_r, aes(x = X, y = Y, color = cluster)) +
+        geom_point(size = 3, alpha = 0.7) +
+        labs(title = "Visualisation des Clusters en fonction de X et Y",
+             x = "Coordonnée X", y = "Coordonnée Y") +
+        theme_minimal() +
+        scale_color_manual(values = c("red", "green", "blue")) +
+
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        )
+
+
+    # Sauvegarder le scatter plot dans un fichier PNG
+    ggsave("visualisation_clusters_white_area_non_0_avecmeteo.png", plot = p, width = 8, height = 6)
+''')
+
+# Message de confirmation pour la visualisation
+print(f"Le graphique des clusters a été sauvegardé.")
+
+# Code pour obtenir les statistiques descriptives par cluster
+summary_cluster = ro.r('''
+    # Statistiques descriptives pour chaque cluster
+    summary_cluster <- by(df_r[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")], df_r$cluster, summary)
+    print(summary_cluster)
+    # Récupérer les statistiques descriptives sous forme de texte
+    summary_cluster_text <- capture.output(summary_cluster)
+''')
+# Récupérer les statistiques descriptives sous forme de texte
+summary_cluster_r = ro.r['summary_cluster_text']
+
+# Convertir les résultats en Python (ils sont maintenant sous forme de liste de chaînes de caractères)
+summary_cluster_list = list(summary_cluster_r)
+
+# Code pour calculer les moyennes des variables par cluster
+mean_by_cluster = ro.r('''
+    # Moyennes des variables par cluster
+    mean_by_cluster <- aggregate(df_r[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")], by = list(cluster = df_r$cluster), FUN = mean)
+    print(mean_by_cluster)
+''')
+mean_by_cluster_r = ro.r['mean_by_cluster']
+
+# Convertir mean_by_cluster en dataframe pandas
+mean_by_cluster_df = pandas2ri.rpy2py(mean_by_cluster_r)
+
+# Code pour générer et sauvegarder les boxplots pour chaque variable
+# Code pour créer et sauvegarder les boxplots par cluster
+ro.r('''
+    # Charger le package ggplot2
+    library(ggplot2)
+
+    # Boxplot pour ISI
+    p1 <- ggplot(df_r, aes(x = as.factor(cluster), y = ISI, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de ISI par cluster", x = "Cluster", y = "ISI") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot ISI
+    ggsave("boxplot_isi_by_cluster_white_area_non_0_avecmeteo.png", plot = p1, width = 8, height = 6)
+
+    # Boxplot pour FWI
+    p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de FWI par cluster", x = "Cluster", y = "FWI") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot FWI
+    ggsave("boxplot_fwi_by_cluster_white_area_non_0_avecmeteo.png", plot = p2, width = 8, height = 6)
+
+    # Boxplot pour Surface Brûlée (area)
+    p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de la Surface Brûlée par cluster", x = "Cluster", y = "Surface Brûlée (area)") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot Surface Brûlée
+    ggsave("boxplot_area_by_cluster_white_area_non_0_avecmeteo.png", plot = p3, width = 8, height = 6)
+''')
+
+# Message de confirmation
+print("Les boxplots ont été sauvegardés sous les noms suivants :")
+print("1. Boxplot ISI : boxplot_isi_by_cluster_area_non_0_avecmeteo.png")
+print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_non_0_avecmeteo.png")
+print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_non_0_avecmeteo.png")
+
+# analyse des points du cluster 3
+dist_points = ro.r('''
+    # Extraire les points du cluster 3
+    cluster_3_points <- subset(df_r, cluster == 3)
+    print(cluster_3_points)
+
+    # Analyser les distances entre points
+    dist_points <- dist(cluster_3_points[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")])
+    
+    # Convertir en matrice pour une meilleure gestion en Python
+    dist_points_matrix <- as.matrix(dist_points)
+    
+    # Convertir la matrice en dataframe (facilite la conversion en pandas)
+    dist_points_df <- as.data.frame(dist_points_matrix)
+    print(dist_points_df)
+''')
+dist_points_r = ro.r['dist_points_df']
+
+# Convertir mean_by_cluster en dataframe pandas
+dist_points_df = pandas2ri.rpy2py(dist_points_r)
+
+# Sauvegarde des résultats dans un fichier texte
+with open("statistiques_par_cluster_area_non_0_avec_meteo.txt", "w", encoding="utf-8") as file:
+    file.write("===== Statistiques Descriptives par Cluster (surface brûlée non nulle, avec temp, RH et wind) =====\n")
+    file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
+    file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
+    file.write(mean_by_cluster_df.to_string())  # Écrire le tableau des moyennes
+    file.write("\n\n===== Distances entre les Points du Cluster 3 =====\n")
+    file.write(dist_points_df.to_string())  # Écrire les distances dans le fichier
+
+
+
+print("=================Clustering ward avec X,Y,ISI,FWI,area non nulle et area nulle=========================")
+
+# Sélectionner les colonnes nécessaires
+df_selected = df_cleaned[['X', 'Y', 'ISI', 'FWI', 'area']]
+
+# Convertir en DataFrame R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r
+
+# Clustering hiérarchique en R
+ro.r('''
+    # Normalisation des données
+    df_scaled <- scale(df_r)
+
+    # Clustering hiérarchique avec méthode de Ward
+    hc <- hclust(dist(df_scaled), method = "ward.D2")
+
+    # Couper l'arbre pour obtenir 3 clusters
+    clusters <- cutree(hc, k = 3)
+
+    # Ajouter les clusters au DataFrame
+    df_r$cluster <- as.factor(clusters)
+
+    # Tracer le dendrogramme et sauvegarder en fichier PNG
+    png("dendrogramme_clustering_area_sanstempRHwind.png", width = 800, height = 600)
+    plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
+    dev.off()
+''')
+
+# Sauvegarder le dendrogramme
+print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_sanstempRHwind.png'.")
+
+# Visualiser les clusters avec un scatter plot
+ro.r('''
+
+    # Vérifier la distribution des clusters
+    print(table(df_r$cluster))
+
+    # Créer un graphique de dispersion des points avec leurs clusters
+    p <- ggplot(df_r, aes(x = X, y = Y, color = cluster)) +
+        geom_point(size = 3, alpha = 0.7) +
+        labs(title = "Visualisation des Clusters en fonction de X et Y",
+             x = "Coordonnée X", y = "Coordonnée Y") +
+        theme_minimal() +
+        scale_color_manual(values = c("red", "green", "blue")) +
+
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        )
+
+
+    # Sauvegarder le scatter plot dans un fichier PNG
+    ggsave("visualisation_clusters_white_area_sanstempRHwind.png", plot = p, width = 8, height = 6)
+''')
+
+# Message de confirmation pour la visualisation
+print(f"Le graphique des clusters a été sauvegardé.")
+
+# Code pour obtenir les statistiques descriptives par cluster
+summary_cluster = ro.r('''
+    # Statistiques descriptives pour chaque cluster
+    summary_cluster <- by(df_r[, c("X", "Y", "ISI", "FWI", "area")], df_r$cluster, summary)
+    print(summary_cluster)
+    # Récupérer les statistiques descriptives sous forme de texte
+    summary_cluster_text <- capture.output(summary_cluster)
+''')
+
+# Récupérer les statistiques descriptives sous forme de texte
+summary_cluster_r = ro.r['summary_cluster_text']
+
+# Convertir les résultats en Python (ils sont maintenant sous forme de liste de chaînes de caractères)
+summary_cluster_list = list(summary_cluster_r)
+
+# Code pour calculer les moyennes des variables par cluster
+df_means = ro.r('''
+    # Moyennes des variables par cluster
+    mean_by_cluster <- aggregate(df_r[, c("X", "Y", "ISI", "FWI", "area")], by = list(cluster = df_r$cluster), FUN = mean)
+    print(mean_by_cluster)
+''')
+mean_by_cluster_r = ro.r['mean_by_cluster']
+
+# Convertir mean_by_cluster en dataframe pandas
+mean_by_cluster_df = pandas2ri.rpy2py(mean_by_cluster_r)
+
+# Code pour générer et sauvegarder les boxplots pour chaque variable
+# Code pour créer et sauvegarder les boxplots par cluster
+ro.r('''
+    # Charger le package ggplot2
+    library(ggplot2)
+
+    # Boxplot pour ISI
+    p1 <- ggplot(df_r, aes(x = as.factor(cluster), y = ISI, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de ISI par cluster", x = "Cluster", y = "ISI") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot ISI
+    ggsave("boxplot_isi_by_cluster_white_area_sanstempRHwind.png", plot = p1, width = 8, height = 6)
+
+    # Boxplot pour FWI
+    p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de FWI par cluster", x = "Cluster", y = "FWI") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot FWI
+    ggsave("boxplot_fwi_by_cluster_white_area_sanstempRHwind.png", plot = p2, width = 8, height = 6)
+
+    # Boxplot pour Surface Brûlée (area)
+    p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de la Surface Brûlée par cluster", x = "Cluster", y = "Surface Brûlée (area)") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot Surface Brûlée
+    ggsave("boxplot_area_by_cluster_white_area_sanstempRHwind.png", plot = p3, width = 8, height = 6)
+''')
+
+# Message de confirmation
+print("Les boxplots ont été sauvegardés sous les noms suivants :")
+print("1. Boxplot ISI : boxplot_isi_by_cluster_area_sanstempRHwind.png")
+print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_sanstempRHwind.png")
+print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_sanstempRHwind.png")
+
+# analyse des points du cluster 3
+dist_points = ro.r('''
+    # Extraire les points du cluster 3
+    cluster_3_points <- subset(df_r, cluster == 3)
+    print(cluster_3_points)
+
+    # Analyser les distances entre points
+    dist_points <- dist(cluster_3_points[, c("X", "Y", "ISI", "FWI", "area")])
+    
+    # Convertir en matrice pour une meilleure gestion en Python
+    dist_points_matrix <- as.matrix(dist_points)
+    
+    # Convertir la matrice en dataframe (facilite la conversion en pandas)
+    dist_points_df <- as.data.frame(dist_points_matrix)
+    print(dist_points_df)
+''')
+dist_points_r = ro.r['dist_points_df']
+
+# Convertir mean_by_cluster en dataframe pandas
+dist_points_df = pandas2ri.rpy2py(dist_points_r)
+
+# Sauvegarde des résultats dans un fichier texte
+with open("statistiques_par_cluster_area_sans_meteo.txt", "w", encoding="utf-8") as file:
+    file.write("===== Statistiques Descriptives par Cluster (surface brûlée nulle et non nulle sans temp, RH et wind) =====\n")
+    file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
+    file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
+    file.write(mean_by_cluster_df.to_string())  # Écrire le tableau des moyennes
+    file.write("\n\n===== Distances entre les Points du Cluster 3 =====\n")
+    file.write(dist_points_df.to_string())  # Écrire les distances dans le fichier
+
+
+print("=================Clustering ward avec X,Y,ISI,FWI, temp, RH, wind, area non nulle et area nulle=========================")
+
+# Sélectionner les colonnes nécessaires
+df_selected = df_cleaned[['X', 'Y', 'ISI', 'FWI', 'temp', 'RH', 'wind', 'area']]
+
+# Convertir en DataFrame R
+df_r = pandas2ri.py2rpy(df_selected)
+ro.globalenv["df_r"] = df_r
+
+# Clustering hiérarchique en R
+ro.r('''
+    # Normalisation des données
+    df_scaled <- scale(df_r)
+
+    # Clustering hiérarchique avec méthode de Ward
+    hc <- hclust(dist(df_scaled), method = "ward.D2")
+
+    # Couper l'arbre pour obtenir 3 clusters
+    clusters <- cutree(hc, k = 3)
+
+    # Ajouter les clusters au DataFrame
+    df_r$cluster <- as.factor(clusters)
+
+    # Tracer le dendrogramme et sauvegarder en fichier PNG
+    png("dendrogramme_clustering_area_avecmeteo.png", width = 800, height = 600)
+    plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
+    dev.off()
+''')
+
+# Sauvegarder le dendrogramme
+print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_avecmeteo.png'.")
+
+# Visualiser les clusters avec un scatter plot
+ro.r('''
+
+    # Vérifier la distribution des clusters
+    print(table(df_r$cluster))
+
+    # Créer un graphique de dispersion des points avec leurs clusters
+    p <- ggplot(df_r, aes(x = X, y = Y, color = cluster)) +
+        geom_point(size = 3, alpha = 0.7) +
+        labs(title = "Visualisation des Clusters en fonction de X et Y",
+             x = "Coordonnée X", y = "Coordonnée Y") +
+        theme_minimal() +
+        scale_color_manual(values = c("red", "green", "blue")) +
+
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        )
+
+
+    # Sauvegarder le scatter plot dans un fichier PNG
+    ggsave("visualisation_clusters_white_area_avecmeteo.png", plot = p, width = 8, height = 6)
+''')
+
+# Message de confirmation pour la visualisation
+print(f"Le graphique des clusters a été sauvegardé.")
+
+# Code pour obtenir les statistiques descriptives par cluster
+summary_cluster = ro.r('''
+    # Statistiques descriptives pour chaque cluster
+    summary_cluster <- by(df_r[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")], df_r$cluster, summary)
+    print(summary_cluster)
+    # Récupérer les statistiques descriptives sous forme de texte
+    summary_cluster_text <- capture.output(summary_cluster)
+''')
+
+# Récupérer les statistiques descriptives sous forme de texte
+summary_cluster_r = ro.r['summary_cluster_text']
+
+# Convertir les résultats en Python (ils sont maintenant sous forme de liste de chaînes de caractères)
+summary_cluster_list = list(summary_cluster_r)
+
+# Code pour calculer les moyennes des variables par cluster
+df_means = ro.r('''
+    # Moyennes des variables par cluster
+    mean_by_cluster <- aggregate(df_r[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")], by = list(cluster = df_r$cluster), FUN = mean)
+    print(mean_by_cluster)
+''')
+mean_by_cluster_r = ro.r['mean_by_cluster']
+
+# Convertir mean_by_cluster en dataframe pandas
+mean_by_cluster_df = pandas2ri.rpy2py(mean_by_cluster_r)
+
+# Code pour générer et sauvegarder les boxplots pour chaque variable
+# Code pour créer et sauvegarder les boxplots par cluster
+ro.r('''
+    # Charger le package ggplot2
+    library(ggplot2)
+
+    # Boxplot pour ISI
+    p1 <- ggplot(df_r, aes(x = as.factor(cluster), y = ISI, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de ISI par cluster", x = "Cluster", y = "ISI") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot ISI
+    ggsave("boxplot_isi_by_cluster_white_area_avecmeteo.png", plot = p1, width = 8, height = 6)
+
+    # Boxplot pour FWI
+    p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de FWI par cluster", x = "Cluster", y = "FWI") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot FWI
+    ggsave("boxplot_fwi_by_cluster_white_area_avecmeteo.png", plot = p2, width = 8, height = 6)
+
+    # Boxplot pour Surface Brûlée (area)
+    p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
+        geom_boxplot() +
+        labs(title = "Distribution de la Surface Brûlée par cluster", x = "Cluster", y = "Surface Brûlée (area)") +
+        theme_minimal() +
+        theme(
+            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
+            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
+            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
+            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
+            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
+            legend.text = element_text(color = "white", size = 10)  # Texte de légende
+        ) 
+
+    # Sauvegarder le boxplot Surface Brûlée
+    ggsave("boxplot_area_by_cluster_white_area_avecmeteo.png", plot = p3, width = 8, height = 6)
+''')
+
+# Message de confirmation
+print("Les boxplots ont été sauvegardés sous les noms suivants :")
+print("1. Boxplot ISI : boxplot_isi_by_cluster_area_avecmeteo.png")
+print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_avecmeteo.png")
+print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_avecmeteo.png")
+
+# analyse des points du cluster 3
+dist_points = ro.r('''
+    # Extraire les points du cluster 3
+    cluster_3_points <- subset(df_r, cluster == 3)
+    print(cluster_3_points)
+
+    # Analyser les distances entre points
+    dist_points <- dist(cluster_3_points[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")])
+    
+    # Convertir en matrice pour une meilleure gestion en Python
+    dist_points_matrix <- as.matrix(dist_points)
+    
+    # Convertir la matrice en dataframe (facilite la conversion en pandas)
+    dist_points_df <- as.data.frame(dist_points_matrix)
+    print(dist_points_df)
+''')
+dist_points_r = ro.r['dist_points_df']
+
+# Convertir mean_by_cluster en dataframe pandas
+dist_points_df = pandas2ri.rpy2py(dist_points_r)
+
+# Sauvegarde des résultats dans un fichier texte
+with open("statistiques_par_cluster_area_avec_meteo.txt", "w", encoding="utf-8") as file:
+    file.write("===== Statistiques Descriptives par Cluster (surface brûlée nulle et non nulle avec temp, RH et wind)  =====\n")
+    file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
+    file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
+    file.write(mean_by_cluster_df.to_string())  # Écrire le tableau des moyennes
+    file.write("\n\n===== Distances entre les Points du Cluster 3 =====\n")
+    file.write(dist_points_df.to_string())  # Écrire les distances dans le fichier
+
+# reste à rendre visible les moustaches des boxplots
+#reste aussi à faire fichier maj des dépendances requirement.txt avec pip list et freeze
 
 print("============== Fin Essai Clustering hiérarchique====================")
 
