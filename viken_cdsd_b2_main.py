@@ -1,35 +1,27 @@
 import pandas as pd
 import numpy as np
-import rpy2.robjects
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('Agg')  # Utiliser un backend sans interface graphique (pas de Tkinter)
-import os
+matplotlib.use('Agg')
 from matplotlib.backends.backend_pdf import PdfPages
+import os
 from fpdf import FPDF
 from scipy import stats
 from scipy.stats import chi2_contingency
+from scipy.interpolate import griddata
 from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 import rpy2.robjects as ro
 from rpy2.robjects import pandas2ri, r
 from rpy2.robjects.packages import importr
-#rpy2.robjects.r('install.packages("forecast")')
 import psycopg2
 from psycopg2 import sql
-from psycopg2 import OperationalError
 from psycopg2.extras import execute_values
-from IPython.display import display
-from PIL import Image
-from scipy.interpolate import griddata
-from mpl_toolkits.mplot3d import Axes3D
-
-
 
 # 1-Collecte, compréhension et audit de la qualité des données
+# Source : https://www.kaggle.com/code/vikasukani/forest-fires-eda-solution-data-analysis/input
 # Chargement des données dans un dataframe
 df = pd.read_csv("forestfires.csv")
 
@@ -43,14 +35,14 @@ print(df.info())
 
 print("##################################################################################")
 
-# Conversion en float de la colonne area et contrôle des premières lignes de la colonne convertie area du dataframe
+# Conversion en float de la colonne "area" et contrôle des premières lignes de la colonne convertie "area" du dataframe
 df["area"] = df["area"].str.replace(",", ".").astype(float)
 print(f"Premières valeurs de la colonne area converties en float: ")
 print(df["area"].head())
 
-# Conversion en category des colonnes month et day
-df['month'] = df['month'].astype('category')
-df['day'] = df['day'].astype('category')
+# Conversion en category des colonnes "month" et "day"
+df["month"] = df["month"].astype("category")
+df["day"] = df["day"].astype("category")
 print(df.info())
 
 print("##################################################################################")
@@ -63,7 +55,7 @@ for col, count in zip(df.columns, missing_counts):
 
 print("##################################################################################")
 
-# Recherche des valeurs distinctes et de leur nombre pour les colonnes month et day
+# Recherche des valeurs distinctes et de leur nombre pour les colonnes "month" et "day"
 columns_to_check = ["month", "day"]
 
 for column in columns_to_check:
@@ -75,7 +67,7 @@ for column in columns_to_check:
 
 print("##################################################################################")
 
-# Recherche de la valeur minimale et maximale des composants du FWI system, du vent, des précipitations et de la surface brûlée
+# Recherche de la valeur minimale et maximale des indices du Fire Weather Index (FWI), du vent, des précipitations et de la surface brûlée
 columns_to_check = ["FFMC", "DMC", "DC", "ISI", "temp", "RH", "wind", "rain", "area"]
 
 result_minmax = df[columns_to_check].agg(["min", "max"])
@@ -83,20 +75,20 @@ print(result_minmax)
 
 print("##################################################################################")
 
-# Recherche des valeurs des composants au-dessus de la plage théorique de valeurs
+# Recherche des valeurs des indices du FWI au-dessus de la plage théorique de valeurs
 
-# Plage théorique pour chaque indice FWI selon https://confluence.ecmwf.int/display/CEMS/User+Guide
+# Plage théorique de valeurs pour chaque indice du FWI selon https://confluence.ecmwf.int/display/CEMS/User+Guide
 theoretical_ranges = {
-    "FFMC": (0, 101),   #The FFMC ranges from 0 to 101, where higher values indicate drier and more easily ignitable fuels.
-    "DMC": (0, 1000),   #The DMC ranges from 0 to 1000, with higher values indicating drier conditions.
-    "DC": (0, 1000), #The DC ranges from 0 to 1000, with higher values indicating drier conditions.
-    "ISI": (0, 50), #The ISI ranges from 0 to 50, with higher values indicating a faster fire spread potential.
+    "FFMC": (0, 101),  # FFMC ranges from 0 to 101, where higher values indicate drier and more easily ignitable fuels.
+    "DMC": (0, 1000),  # DMC ranges from 0 to 1000, with higher values indicating drier conditions.
+    "DC": (0, 1000),  # DC ranges from 0 to 1000, with higher values indicating drier conditions.
+    "ISI": (0, 50)  # ISI ranges from 0 to 50, with higher values indicating a faster fire spread potential.
 }
 
 # Liste des colonnes à vérifier
 columns_to_check = ["FFMC", "DMC", "DC", "ISI"]
 
-# Vérification des valeurs au-dessus de la plage théorique pour les indices FWI
+# Vérification des valeurs au-dessus de la plage théorique pour les indices du FWI
 for column in theoretical_ranges:
     min_val, max_val = theoretical_ranges[column]
 
@@ -114,7 +106,7 @@ print("#########################################################################
 
 # Recherche de lignes dont les valeurs ont un type non conforme à leur colonne
 
-# Dictionnaire des types attendus pour chaque colonne
+# Dictionnaire du type attendu pour chaque colonne
 expected_types = {
     "FFMC": float,
     "DMC": float,
@@ -137,12 +129,12 @@ for column, expected_type in expected_types.items():
 
     if not non_conforming_rows.empty:
         has_non_conforming_rows = True
-        print(f"Colonnes avec valeurs non conformes dans '{column}':")
+        print(f"Colonnes avec valeurs non conformes dans '{column}': ")
         print(non_conforming_rows, "\n")
 
 # Si aucune ligne non conforme n'a été trouvée
 if not has_non_conforming_rows:
-    print("Aucune ligne trouvée de type non conforme avec la grandeur de la colonne.")
+    print("Aucune ligne trouvée de type non conforme avec la grandeur de la colonne. ")
 
 print("##################################################################################")
 
@@ -150,7 +142,7 @@ print("#########################################################################
 duplicates = df[df.duplicated(keep=False)]  # Conserver toutes les occurrences des doublons
 
 if duplicates.empty:
-    print("Aucun doublon trouvé.")
+    print("Aucun doublon trouvé. ")
 else:
     # Récupérer les indices des doublons
     duplicate_indices = duplicates.index.tolist()
@@ -167,7 +159,7 @@ else:
 print("##################################################################################")
 
 # Premier affichage des statistiques descriptives sur le dataframe
-pd.set_option('display.max_columns', None)
+pd.set_option("display.max_columns", None)
 print(df.describe())
 
 print("##################################################################################")
@@ -175,7 +167,7 @@ print("#########################################################################
 # 2-Alimentation, nettoyage et traitement des données
 
 # Suppression des lignes en doublons
-print("\nLignes à supprimer (indices) :")
+print("\nLignes à supprimer (indices): ")
 print(to_drop)
 
 df_cleaned = df.drop(to_drop)
@@ -185,86 +177,127 @@ df_cleaned.info()
 
 print("##################################################################################")
 
-# Création d'une nouvelle colonne 'season' pour stocker la saison correspondante
+# Création d'une nouvelle colonne "season" à partir de la colonne "month"
 # Définition des saisons
 season_mapping = {
-    'jan': 'Hiver', 'feb': 'Hiver', 'dec': 'Hiver',
-    'mar': 'Printemps', 'apr': 'Printemps', 'may': 'Printemps',
-    'jun': 'Été', 'jul': 'Été', 'aug': 'Été',
-    'sep': 'Automne', 'oct': 'Automne', 'nov': 'Automne'
+    "jan": "hiver", "feb": "hiver", "dec": "hiver",
+    "mar": "printemps", "apr": "printemps", "may": "printemps",
+    "jun": "ete", "jul": "ete", "aug": "ete",
+    "sep": "automne", "oct": "automne", "nov": "automne"
 }
 
-df_cleaned['season'] = df_cleaned['month'].map(season_mapping).astype('category')
+df_cleaned["season"] = df_cleaned["month"].map(season_mapping).astype("category")
 df_cleaned.info()
 
 print("##################################################################################")
 
-# Ajout d'une colonne calculant le BUI index pour en déduire le FWI index à partir de la formule de https://wikifire.wsl.ch/tiki-index8720.html?page=Buildup+index
+# Ajout d'une colonne calculant l'indice BUI pour en déduire l'indice FWI à partir de la source https://wikifire.wsl.ch/tiki-index8720.html?page=Buildup+index
 def calculate_bui(dmc, dc):
     condition = dmc <= 0.4 * dc
     bui = np.where(
         condition,
         (0.8 * dmc * dc) / (dmc + 0.4 * dc),
-        dmc - (1 - (0.8 * dc) / (dmc + 0.4 * dc)) * (0.92 + (0.0114 * dmc) ** 1.7)
+        dmc - (1 - (0.8 * dc) / (dmc + 0.4 * dc)) *
+        (0.92 + (0.0114 * dmc) ** 1.7)
     )
     rounded_bui = np.round(bui, 1)
     return rounded_bui
 
-df_cleaned['BUI'] = calculate_bui(df_cleaned['DMC'], df_cleaned['DC'])
+df_cleaned["BUI"] = calculate_bui(df_cleaned["DMC"], df_cleaned["DC"])
 
-# Caster la colonne 'BUI' en type 'float'
-df_cleaned['BUI'] = df_cleaned['BUI'].astype('float')
+# Caster la colonne "BUI" en type "float"
+df_cleaned["BUI"] = df_cleaned["BUI"].astype("float")
 
 # Vérifier le type de la colonne
-print(df_cleaned['BUI'].dtype)
+print(df_cleaned["BUI"].dtype)
 
 # Affichage du DataFrame avec la nouvelle colonne
-print("Premieres lignes du dataframe avec colonne BUI")
+print("Premieres lignes du dataframe avec la colonne BUI: ")
 print(df_cleaned.head())
 
-# Ajout d'une colonne estimant le FWI index à partir d'une formule simplifiée selon publication de Van Wagner (1987)
+# Ajout d'une colonne calculant l'indice FWI à partir d'une formule simplifiée selon publication de Van Wagner (1987)
 def calculate_fwi(isi, bui):
-    #return np.exp(0.05039 * isi) * bui ** 0.82 formule à vérifier
     fwi = np.sqrt(0.1 * isi * bui)
     rounded_fwi = np.round(fwi, 1)
     return rounded_fwi
 
-df_cleaned['FWI'] = calculate_fwi(df_cleaned['ISI'], df_cleaned['BUI'])
+df_cleaned["FWI"] = calculate_fwi(df_cleaned["ISI"], df_cleaned["BUI"])
 
-# Caster la colonne 'FWI' en type 'float'
-df_cleaned['FWI'] = df_cleaned['FWI'].astype('float')
+# Caster la colonne "FWI" en type "float"
+df_cleaned["FWI"] = df_cleaned["FWI"].astype("float")
 
 # Vérifier le type de la colonne
-print(df_cleaned['FWI'].dtype)
+print(df_cleaned["FWI"].dtype)
 
-# Affichage du DataFrame avec les nouvelles colonnes
-print("Premieres lignes du dataframe avec colonne FWI")
-print(df_cleaned['FWI'])
+# Affichage de la colonne "FWI"
+print("Affichage de la colonne FWI: ")
 
 # Désactiver la limitation d'affichage
-pd.set_option('display.max_rows', None)
+pd.set_option("display.max_rows", None)
 
-# Afficher la colonne FWI
-print(df_cleaned['FWI'])
+print(df_cleaned["FWI"])
 
-# Afficher la valeur max de la colonne FWI
-print(f"La valeur maximale de FWI est: {df_cleaned['FWI'].max()}.")
+# Afficher la valeur max de la colonne "FWI"
+print(f"La valeur maximale de l'indice FWI dans le dataframe est: {df_cleaned['FWI'].max()}.")
 
-# Ajouter un champ niveau de danger et un champ description du niveau selon https://climate-adapt.eea.europa.eu/en/metadata/indicators/fire-weather-index-monthly-mean-1979-2019
-def get_danger_level(fwi):
-    if fwi < 5.2:
-        return "Très faible danger"
-    elif 5.2 <= fwi < 11.2:
-        return "Faible danger"
-    elif 11.2 <= fwi < 21.3:
-        return "Danger modéré"
-    elif 21.3 <= fwi < 38.0:
-        return "Fort danger"
-    elif 38.0 <= fwi < 50.0:
-        return "Très fort danger"
+# Ajout d'une colonne "bscale" mesurant l'accumulation de combustible
+def get_bscale(bui):
+    if bui < 19:
+        return "b1"
+    elif 19 <= bui < 39:
+        return "b2"
+    elif 39 <= bui < 59:
+        return "b3"
     else:
-        return "Danger extrême"
+        return "b4"
 
+# Ajout d'une colonne "risque_lie_au_combustible"
+def get_bscale_description(bui):
+    if bui < 19:
+        return "faible accumulation de combustible"
+    elif 19 <= bui < 39:
+        return "accumulation moderee"
+    elif 39 <= bui < 59:
+        return "accumulation elevee"
+    else:
+        return "accumulation extreme"
+
+# Ajout d'une colonne "iscale" mesurant la rapidité de propagation du feu
+def get_iscale(isi):
+    if isi < 3:
+        return "i1"
+    elif 3 <= isi < 7:
+        return "i2"
+    elif 7 <= isi < 12:
+        return "i3"
+    else:
+        return "i4"
+
+# Ajout d'une colonne "risque_lie_a_propagation"
+def get_iscale_description(isi):
+    if isi < 3:
+        return "propagation tres lente"
+    elif 3 <= isi < 7:
+        return "propagation moderee"
+    elif 7 <= isi < 12:
+        return "propagation rapide"
+    else:
+        return "propagation extreme"
+
+# Ajouter d'une colonne "niveau de danger" selon source https://forest-fire.emergency.copernicus.eu/about-effis/technical-background/fire-danger-forecast
+def get_danger_level(fwi):
+    if fwi < 2:  # 5.2
+        return "conditions humides, feu peu probable"
+    elif 2 <= fwi < 5:  # 11.2
+        return "risque modéré, feu possible sous certaines conditions"
+    elif 5 <= fwi < 8:  # 21.3
+        return "risque accru, feu rapide en présence de vent"
+    elif 8 <= fwi < 11:  # 38
+        return "propagation rapide, feux difficiles à controler"
+    else:  # 50
+        return "conditions critiques, incendies intenses et incontrolables"
+
+# Ajouter d'une colonne "description du niveau"
 def get_level_description(fwi):
     if fwi < 5.2:
         return "Peu ou pas de risque d'incendie"
@@ -279,72 +312,82 @@ def get_level_description(fwi):
     else:
         return "Conditions extrêmes, très grand risque d'incendie"
 
-# Ajouter les nouvelles colonnes 'danger_level' et 'level_description' au DataFrame
-df_cleaned['danger_level'] = df_cleaned['FWI'].apply(get_danger_level)
-df_cleaned['level_description'] = df_cleaned['FWI'].apply(get_level_description)
+# Ajouter les six nouvelles colonnes au dataframe
+df_cleaned["bscale"] = df_cleaned["BUI"].apply(get_bscale)
+df_cleaned["bscale_description"] = df_cleaned["BUI"].apply(get_bscale_description)
+df_cleaned["iscale"] = df_cleaned["ISI"].apply(get_iscale)
+df_cleaned["iscale_description"] = df_cleaned["ISI"].apply(get_iscale_description)
+df_cleaned["danger_level"] = df_cleaned["FWI"].apply(get_danger_level)
+df_cleaned["level_description"] = df_cleaned["FWI"].apply(get_level_description)
 
-# Caster les colonnes 'danger_level' et 'level_description' en type 'category'
-df_cleaned['danger_level'] = df_cleaned['danger_level'].astype('category')
-df_cleaned['level_description'] = df_cleaned['level_description'].astype('category')
+# Caster les six nouvelles colonnes en type "category"
+df_cleaned["bscale"] = df_cleaned["bscale"].astype("category")
+df_cleaned["bscale_description"] = df_cleaned["bscale_description"].astype("category")
+df_cleaned["iscale"] = df_cleaned["iscale"].astype("category")
+df_cleaned["iscale_description"] = df_cleaned["iscale_description"].astype("category")
+df_cleaned["danger_level"] = df_cleaned["danger_level"].astype("category")
+df_cleaned["level_description"] = df_cleaned["level_description"].astype("category")
 
 # Vérifier le type des nouvelles colonnes
+print(df_cleaned["bscale"].dtype)
+print(df_cleaned["bscale_description"].dtype)
+print(df_cleaned["iscale"].dtype)
+print(df_cleaned["iscale_description"].dtype)
 print(df_cleaned['danger_level'].dtype)
 print(df_cleaned['level_description'].dtype)
 
-# Affichage du DataFrame avec les nouvelles colonnes
-print(df_cleaned[['FWI', 'danger_level', 'level_description']])
+# Affichage des six nouvelles colonnes du DataFrame
+
+# Désactiver la limitation d'affichage
+pd.set_option("display.max_rows", None)
+
+print(df_cleaned[["bscale", "bscale_description", "iscale", "iscale_description", "danger_level", "level_description"]])
 
 print("##################################################################################")
 
-# Comptage des lignes où 'area' est égal à 0 et différent de 0
-count_area_0 = (df_cleaned['area'] == 0).sum()  # Nombre de lignes avec area == 0
-count_area_non_0 = (df_cleaned['area'] != 0).sum()  # Nombre de lignes avec area != 0
+# Comptage des lignes où la colonne "area" (surface brûlée) est égale à 0 et est différente de 0
+count_area_0 = (df_cleaned["area"] == 0).sum()  # Nombre de lignes avec area == 0
+count_area_non_0 = (df_cleaned["area"] != 0).sum()  # Nombre de lignes avec area != 0
 
-# Créer un DataFrame pour ces comptages
-data = {'Condition': ['area = 0', 'area != 0'], 'Count': [count_area_0, count_area_non_0]}
-df_count = pd.DataFrame(data)
+# Nombre total de lignes du dataframe
+nombre_lignes = df_cleaned.shape[0]
 
-# Tracer le diagramme en barres
-plt.figure(figsize=(6, 4))
-sns.barplot(x='Condition', y='Count', data=df_count, palette='Blues')
-plt.title("Nombre de lignes avec 'area' égal à 0 et différent de 0")
-plt.xlabel("Condition")
-plt.ylabel("Nombre de lignes")
-plt.savefig("nombre_lignes_area_0_et_diff_0.png", dpi=300, bbox_inches="tight")
-plt.close()
+print(f"Le dataframe a un nombre total de lignes de: {nombre_lignes} dont {count_area_0} avec surface brûlée nulle.")
 
 print("##################################################################################")
 
-# Ajout d'une colonne pour transformation logarithmique de 'area' pour améliorer la normalité
-df_cleaned['log_area'] = np.log1p(df_cleaned['area'])
+# Ajout d'une colonne log(1 + "area") pour réduire l'asymétrie de la distribution des valeurs de la colonne area
+df_cleaned["log_area"] = np.log1p(df_cleaned["area"])
 
 print("##################################################################################")
 
-# Création de deux dataframe sous-ensembles de df_cleaned (area = 0 et area != 0)
+# Création de deux DataFrames sous-ensembles de df_cleaned (area = 0 et area != 0)
 
-# Filtrer les lignes où 'area' est égal à 0
-df_area_0 = df_cleaned[df_cleaned['area'] == 0]
+# Filtrer les lignes où la colonne "area" est égale à 0
+df_area_0 = df_cleaned[df_cleaned["area"] == 0]
 
-# Filtrer les lignes où 'area' est différent de 0
-df_area_non_0 = df_cleaned[df_cleaned['area'] != 0]
+# Filtrer les lignes où la colonne "area" est différente de 0
+df_area_non_0 = df_cleaned[df_cleaned["area"] != 0]
 
 # Afficher les DataFrames résultants
-print("DataFrame avec 'area' = 0:")
+print("DataFrame avec area = 0: ")
 print(df_area_0.head())
 
-print("\nDataFrame avec 'area' != 0:")
+print("\nDataFrame avec area != 0: ")
 print(df_area_non_0.head())
 
 print("##################################################################################")
 
 # 3-Analyse et Visualisation des données
+
 # Analyses univariées
-# 📁 Création du répertoire pour les analyses univariées
-save_dir = "analyse_distrib_univariee"
+
+# Création du répertoire pour les analyses univariées
+save_dir = "1_viken_m2icdsd_2025_b2_analyse_distrib_univariee"
 os.makedirs(save_dir, exist_ok=True)
 
 # Mesure de l'aplatissement de chaque distribution (kurtosis)
-# Création du PDF
+# Création d'un fichier PDF pour sauvegarder l'analyse
 pdf = FPDF()
 pdf.set_auto_page_break(auto=True, margin=15)
 pdf.add_page()
@@ -400,7 +443,7 @@ print(f"Le fichier PDF a été créé : {pdf_output_path}")
 
 # Mesure de la distribution des données de chaque colonne par rapport à une distribution normale (skewness)
 
-# Création du PDF
+# Création d'un fichier PDF pour sauvegarder l'analyse
 pdf = FPDF()
 pdf.set_auto_page_break(auto=True, margin=15)
 pdf.add_page()
@@ -455,11 +498,11 @@ print("#########################################################################
 # Configuration du style des graphes
 sns.set_style("whitegrid")
 
-# Séparation des variables numériques et catégoriques
+# Séparation des variables numériques et celles de type "category"
 num_vars = ["X", "Y", "FFMC", "DMC", "DC", "ISI", "BUI", "temp", "RH", "wind", "rain", "area", "log_area", "FWI"]
-cat_vars = ["month", "day", "season", "danger_level", "level_description"]
+cat_vars = ["month", "day", "season", "bscale", "bscale_description", "iscale", "iscale_description", "danger_level", "level_description"]
 
-# 📌 **1. Visualisation des variables numériques**
+# Visualisation des variables numériques
 for col in num_vars:
     plt.figure(figsize=(8, 5))
     sns.histplot(df_cleaned[col], bins=10, kde=True, color="royalblue")
@@ -467,13 +510,11 @@ for col in num_vars:
     plt.xlabel(col, fontsize=12)
     plt.ylabel("Fréquence", fontsize=12)
 
-    # Sauvegarde des figures en PNG et PDF
+    # Sauvegarde des figures en PNG
     plt.savefig(os.path.join(save_dir, f"{col}.png"), format="png", dpi=300)
-    plt.savefig(os.path.join(save_dir, f"{col}.pdf"), format="pdf", dpi=300)
-
     plt.close()  # Fermer la figure pour éviter l'affichage multiple
 
-# 📌 **2. Visualisation des variables catégoriques**
+# Visualisation des variables catégoriques**
 for col in cat_vars:
     plt.figure(figsize=(8, 5))
     sns.countplot(x=df_cleaned[col], palette="viridis")
@@ -484,22 +525,16 @@ for col in cat_vars:
 
     # Sauvegarde des figures en PNG et PDF
     plt.savefig(os.path.join(save_dir, f"{col}.png"), format="png", dpi=300)
-    plt.savefig(os.path.join(save_dir, f"{col}.pdf"), format="pdf", dpi=300)
+    plt.close()
 
-    plt.close()  # Fermer la figure pour éviter l'affichage multiple
-
-print(f"Les graphiques sont enregistrés dans le dossier : {save_dir}")
+print(f"Les graphiques de distribution de chaque colonne sont enregistrés dans le dossier : {save_dir}")
 
 # Affichage de plusieurs courbes sur une même page
-
-# Création du répertoire pour les graphiques
-#save_dir = "analyse_distrib_univariee_subplots"
-#os.makedirs(save_dir, exist_ok=True)
 
 # Configuration du style des graphes
 sns.set_style("whitegrid")
 
-### 📌 1. Graphiques X et Y sur la même figure ###
+# Graphiques X et Y sur la même figure
 fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 5))
 
 sns.countplot(x=df_cleaned["X"], palette="viridis", ax=axes[0])
@@ -514,10 +549,9 @@ axes[1].set_ylabel("Nombre d'observations", fontsize=12)
 
 plt.tight_layout()
 plt.savefig(os.path.join(save_dir, "X_Y.png"), format="png", dpi=300)
-plt.savefig(os.path.join(save_dir, "X_Y.pdf"), format="pdf", dpi=300)
 plt.close()
 
-### 📌 2. Graphiques FFMC, DMC, DC, ISI, BUI, FWI sur la même figure ###
+# Graphiques FFMC, DMC, DC, ISI, BUI, FWI sur la même figure
 fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 15))
 fire_vars = ["FFMC", "DMC", "DC", "ISI", "BUI", "FWI"]
 
@@ -529,10 +563,9 @@ for i, col in enumerate(fire_vars):
 
 plt.tight_layout()
 plt.savefig(os.path.join(save_dir, "FFMC_DMC_DC_ISI_BUI_FWI.png"), format="png", dpi=300)
-plt.savefig(os.path.join(save_dir, "FFMC_DMC_DC_ISI_BUI_FWI.pdf"), format="pdf", dpi=300)
 plt.close()
 
-### 📌 3. Graphiques temp, RH, wind, rain sur la même figure ###
+# Graphiques temp, RH, wind, rain sur la même figure
 fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 10))
 weather_vars = ["temp", "RH", "wind", "rain"]
 
@@ -544,50 +577,78 @@ for i, col in enumerate(weather_vars):
 
 plt.tight_layout()
 plt.savefig(os.path.join(save_dir, "temp_RH_wind_rain.png"), format="png", dpi=300)
-plt.savefig(os.path.join(save_dir, "temp_RH_wind_rain.pdf"), format="pdf", dpi=300)
 plt.close()
 
-print(f"Les graphiques sont enregistrés dans le dossier : {save_dir}")
+print(f"Les ensembles de graphiques donnant la distribution des colonnes sont enregistrés dans le dossier : {save_dir}")
 
-# 📁 Création du répertoire pour sauvegarder les graphiques
-#save_dir = "analyse_distrib_univariee_area"
-#os.makedirs(save_dir, exist_ok=True)
-
-# 📊 Comptage des valeurs où area = 0 et area > 0
+# Diagramme en barres pour comptage des valeurs où "area" = 0 et "area" > 0
 df_count = pd.DataFrame({
     "Condition": ["Surface Brûlée = 0", "Surface Brûlée > 0"],
     "Count": [sum(df_cleaned["area"] == 0), sum(df_cleaned["area"] > 0)]
 })
 
-# 🔥 Tracer le diagramme en barres
 plt.figure(figsize=(7, 5))
 sns.barplot(x='Condition', y='Count', data=df_count, palette='Blues')
 
-# 📌 Personnalisation du graphique
-plt.title("Nombre de lignes avec 'area' égal à 0 et différent de 0", fontsize=14, fontweight='bold')
+plt.title("Nombre de lignes avec area égal à 0 et area différent de 0", fontsize=14, fontweight='bold')
 plt.xlabel("Condition", fontsize=12)
 plt.ylabel("Nombre de lignes", fontsize=12)
 plt.xticks(fontsize=11)
 plt.yticks(fontsize=11)
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 
-# 📂 Sauvegarde du graphique
+# Sauvegarde du diagramme en barres
 file_path_png = os.path.join(save_dir, "area_distribution.png")
-file_path_pdf = os.path.join(save_dir, "area_distribution.pdf")
 plt.savefig(file_path_png, format="png", dpi=300)
-plt.savefig(file_path_pdf, format="pdf", dpi=300)
+plt.close()
+
+# Histogrammes des colonnes "area" et "log_area" pour visualiser leur distribution
+# Créer un document avec deux graphiques (2 lignes, 1 colonne)
+plt.figure(figsize=(12, 8))
+
+# Premier histogramme : Distribution de "area"
+plt.subplot(2, 1, 1)  # 2 lignes, 1 colonne, position 1
+sns.histplot(df_cleaned["area"], bins=30, kde=False, color='skyblue', edgecolor='black')
+
+# Titre et labels du premier graphique
+plt.title('Répartition des valeurs de la colonne "area"', fontsize=14, fontweight='bold')
+plt.xlabel('Surface (area)', fontsize=12)
+plt.ylabel('Fréquence', fontsize=12)
+plt.xticks(fontsize=11)
+plt.yticks(fontsize=11)
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+# Deuxième histogramme : Distribution de 'log1p(area)'
+plt.subplot(2, 1, 2)  # 2 lignes, 1 colonne, position 2
+sns.histplot(df_cleaned["log_area"], bins=30, kde=False, color='lightgreen', edgecolor='black')
+
+# Titre et labels du deuxième graphique
+plt.title('Répartition des valeurs de "log_area"', fontsize=14, fontweight='bold')
+plt.xlabel('log1p(Surface)', fontsize=12)
+plt.ylabel('Fréquence', fontsize=12)
+plt.xticks(fontsize=11)
+plt.yticks(fontsize=11)
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+
+# Ajuster l'espacement entre les graphiques
+plt.tight_layout()
+
+# Sauvegarder l'image dans un fichier
+file_path_png = os.path.join(save_dir, "area_and_log_area_histograms_distribution.png")
+plt.savefig(file_path_png, format="png", dpi=300)
+
+# Fermer la figure sans l'afficher
 plt.close()
 
 print("##################################################################################")
 
 # Statistiques descriptives
 
-# 📁 Création du répertoire pour sauvegarder les fichiers
-
-save_dir = "desc_stats"
+# Création du répertoire pour sauvegarder les fichiers
+save_dir = "2_viken_m2icdsd_2025_b2_desc_stats"
 os.makedirs(save_dir, exist_ok=True)
 
-# 📌 Liste des regroupements de variables pour les pages du PDF
+# Liste des regroupements de variables pour les pages du PDF
 plots_groups = {
     "X_Y": ["X", "Y"],
     "FFMC_DMC_DC_ISI_BUI_FWI": ["FFMC", "DMC", "DC", "ISI", "BUI", "FWI"],
@@ -595,64 +656,64 @@ plots_groups = {
     "Area": ["area", "log_area"]
 }
 
-# 📄 Création du fichier PDF
-pdf_path = os.path.join(save_dir, "boxplots_with_stats.pdf")
-with PdfPages(pdf_path) as pdf:
-    # 🔥 Génération des boxplots
-    for page_name, cols in plots_groups.items():
-        fig, axes = plt.subplots(nrows=1, ncols=len(cols), figsize=(6 * len(cols), 6))
+# Création du fichier PDF
+#pdf_path = os.path.join(save_dir, "boxplots_with_stats.pdf")
+#with PdfPages(pdf_path) as pdf:
+# Génération des boxplots
+for page_name, cols in plots_groups.items():
+    fig, axes = plt.subplots(nrows=1, ncols=len(cols), figsize=(6 * len(cols), 6))
 
-        # ✅ S'assurer que axes est toujours une liste
-        if len(cols) == 1:
-            axes = [axes]  # Convertir en liste si une seule variable
+    # S'assurer que axes est toujours une liste
+    if len(cols) == 1:
+        axes = [axes]  # Convertir en liste si une seule variable
 
-        # 🔄 Création des boxplots
-        for i, col in enumerate(cols):
-            ax = axes[i]
-            sns.boxplot(y=df_cleaned[col], ax=ax, color="royalblue", width=0.5)
+    # Création des boxplots
+    for i, col in enumerate(cols):
+        ax = axes[i]
+        sns.boxplot(y=df_cleaned[col], ax=ax, color="royalblue", width=0.5)
 
-            # 📊 Calcul des statistiques
-            Q1 = df_cleaned[col].quantile(0.25)
-            Q2 = df_cleaned[col].median()  # Médiane
-            Q3 = df_cleaned[col].quantile(0.75)
-            Q4 = df_cleaned[col].max()
-            mean_value = df_cleaned[col].mean()
+        """ # Calcul des statistiques
+        Q1 = df_cleaned[col].quantile(0.25)
+        Q2 = df_cleaned[col].median()  # Médiane
+        Q3 = df_cleaned[col].quantile(0.75)
+        Q4 = df_cleaned[col].max()
+        mean_value = df_cleaned[col].mean()
 
-            # 🎯 Ajout des valeurs sur le graphique
-            statist = {
-                "Q1": Q1,
-                "Médiane (Q2)": Q2,
-                "Q3": Q3,
-                "Max (Q4)": Q4,
-                "Moyenne": mean_value
-            }
+        # Ajout des valeurs sur le graphique
+        statist = {
+            "Q1": Q1,
+            "Médiane (Q2)": Q2,
+            "Q3": Q3,
+            "Max (Q4)": Q4,
+            "Moyenne": mean_value
+        }"""
 
-            # 📌 Positionner les textes sur le graphique
-            for j, (stat_name, value) in enumerate(statist.items()):
-                ax.text(0, value, f"{stat_name}: {value:.2f}", ha='center', va='bottom',
-                        fontsize=10, fontweight='bold', bbox=dict(facecolor='white', alpha=0.6))
+        """# Positionner les textes sur le graphique
+        for j, (stat_name, value) in enumerate(statist.items()):
+            ax.text(0, value, f"{stat_name}: {value:.2f}", ha='center', va='bottom',
+                    fontsize=10, fontweight='bold', bbox=dict(facecolor='white', alpha=0.6))"""
 
-            # 🎨 Ajout du titre et labels
-            ax.set_title(f"Boxplot de {col}", fontsize=14, fontweight='bold')
-            ax.set_ylabel(col, fontsize=12)
-            ax.grid(axis='x', linestyle='--', alpha=0.7)
+        # Ajout du titre et labels
+        ax.set_title(f"Boxplot de {col}", fontsize=14, fontweight='bold')
+        ax.set_ylabel(col, fontsize=12)
+        ax.grid(axis='x', linestyle='--', alpha=0.7)
 
-        plt.tight_layout()
+    plt.tight_layout()
 
-        # 📌 Sauvegarde en PDF
-        pdf.savefig(fig)
+    # Sauvegarde en PDF
+    #pdf.savefig(fig)
 
-        # 📌 Sauvegarde en PNG
-        png_path = os.path.join(save_dir, f"boxplot_{page_name}.png")
-        plt.savefig(png_path, dpi=300)
+    # Sauvegarde en PNG
+    png_path = os.path.join(save_dir, f"boxplot_{page_name}.png")
+    plt.savefig(png_path, dpi=300)
 
-        plt.close()
+    plt.close()
 
-print(f"✅ Boxplots sauvegardés dans {save_dir}.")
+print(f"Boxplots pour statistiques descriptives sauvegardés dans {save_dir}.")
 
 print("##################################################################################")
 
-# 📏 Calcul des statistiques descriptives avec Numpy
+# Calcul des statistiques descriptives avec Numpy
 statistics = {}
 
 for col in df_cleaned.select_dtypes(include=[np.number]).columns:
@@ -682,46 +743,46 @@ for col in df_cleaned.select_dtypes(include=[np.number]).columns:
     }
     statistics[col] = statist
 
-# 🔹 Création du DataFrame des statistiques
+# Création du DataFrame des statistiques
 desc_stats_df = pd.DataFrame(statistics).T
 
-# 📄 Création du fichier PDF et PNG pour sauvegarder
+# Création du fichier PDF et PNG pour sauvegarder
 pdf_path = os.path.join(save_dir, "descriptive_statistics.pdf")
-png_path = os.path.join(save_dir, "descriptive_statistics.png")
+#png_path = os.path.join(save_dir, "descriptive_statistics.png")
 
 with PdfPages(pdf_path) as pdf:
-    # 📊 Tracer les statistiques sous forme de tableau
+    # Tracer les statistiques sous forme de tableau
     fig, ax = plt.subplots(figsize=(10, 6))  # Taille du graphique pour le tableau
     ax.axis('off')
     ax.table(cellText=desc_stats_df.values, colLabels=desc_stats_df.columns, rowLabels=desc_stats_df.index,
              loc='center',
              cellLoc='center', colLoc='center', bbox=[0, 0, 1, 1])
 
-    # 📌 Sauvegarder le tableau en PDF
+    # Sauvegarder le tableau en PDF
     pdf.savefig(fig)
 
-    # 📌 Sauvegarder le tableau en PNG
-    plt.savefig(png_path, dpi=300)
+    # Sauvegarder le tableau en PNG
+    #plt.savefig(png_path, dpi=300)
 
     plt.close()
 
-print(f"✅ Statistiques descriptives sauvegardées dans {save_dir}.")
+print(f"Statistiques descriptives sauvegardées dans {save_dir}.")
 
 print("##################################################################################")
 
 # Analyses bivariées
 
 # Définir un répertoire et le créer si non encore existant
-save_dir = "analyses_bivariées"
+save_dir = "3_viken_m2icdsd_2025_b2_analyses_bivariées"
 os.makedirs(save_dir, exist_ok=True)
 
 # Visualisation de la distribution mensuelle de la surface brûlée sur le dataframe avec surface brûlée non nulle
 
 # Liste des mois dans l'ordre du calendrier
-mois_ordre = ['jan', 'feb', 'mar', 'apr', 'may', 'jun',
-              'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+mois_ordre = ["jan", "feb", "mar", "apr", "may", "jun",
+              "jul", "aug", "sep", "oct", "nov", "dec"]
 
-# 1. Boxplot de la distribution de la surface brûlée par mois
+# Boxplot de la distribution de la surface brûlée par mois
 plt.figure(figsize=(10, 6))
 sns.boxplot(data=df_area_non_0, x='month', y='area', palette="Set2", order=mois_ordre)
 plt.title("Distribution Mensuelle de la Surface Brûlée")
@@ -730,15 +791,13 @@ plt.ylabel("Surface Brûlée (area)")
 plt.xticks(rotation=45)
 plt.tight_layout()
 
-# Sauvegarde du graphique en .png et .pdf
-boxplot_filename_png = os.path.join(save_dir, "boxplot_surface_brulee.png")
-boxplot_filename_pdf = os.path.join(save_dir, "boxplot_surface_brulee.pdf")
+# Sauvegarde du graphique en .png
+boxplot_filename_png = os.path.join(save_dir, "boxplot_surface_brulee_par_mois.png")
 plt.savefig(boxplot_filename_png)
-plt.savefig(boxplot_filename_pdf)
 plt.close()
 
-# 2. Diagramme en barres pour la somme de la surface brûlée par mois
-monthly_sum = df_area_non_0.groupby('month')['area'].sum().reset_index()  # Somme de la surface brûlée par mois
+# Diagramme en barres pour la somme de la surface brûlée par mois
+monthly_sum = df_area_non_0.groupby("month")["area"].sum().reset_index()  # Somme de la surface brûlée par mois
 plt.figure(figsize=(10, 6))
 sns.barplot(data=monthly_sum, x='month', y='area', palette="Set3", order=mois_ordre)
 plt.title("Surface Brûlée Totale par Mois")
@@ -747,15 +806,13 @@ plt.ylabel("Surface Brûlée Totale")
 plt.xticks(rotation=45)
 plt.tight_layout()
 
-# Sauvegarde du graphique en .png et .pdf
+# Sauvegarde du graphique en .png
 barplot_sum_filename_png = os.path.join(save_dir, "barplot_sum_surface_brulee.png")
-barplot_sum_filename_pdf = os.path.join(save_dir, "barplot_sum_surface_brulee.pdf")
 plt.savefig(barplot_sum_filename_png)
-plt.savefig(barplot_sum_filename_pdf)
 plt.close()
 
 # 3. Diagramme en barres pour la moyenne de la surface brûlée par mois
-monthly_avg = df_area_non_0.groupby('month')['area'].mean().reset_index()  # Moyenne de la surface brûlée par mois
+monthly_avg = df_area_non_0.groupby("month")["area"].mean().reset_index()  # Moyenne de la surface brûlée par mois
 plt.figure(figsize=(10, 6))
 sns.barplot(data=monthly_avg, x='month', y='area', palette="Set3", order=mois_ordre)
 plt.title("Surface Brûlée Moyenne par Mois")
@@ -764,14 +821,12 @@ plt.ylabel("Surface Brûlée Moyenne")
 plt.xticks(rotation=45)
 plt.tight_layout()
 
-# Sauvegarde du graphique en .png et .pdf
+# Sauvegarde du graphique en .png
 barplot_avg_filename_png = os.path.join(save_dir, "barplot_avg_surface_brulee.png")
-barplot_avg_filename_pdf = os.path.join(save_dir, "barplot_avg_surface_brulee.pdf")
 plt.savefig(barplot_avg_filename_png)
-plt.savefig(barplot_avg_filename_pdf)
 plt.close()
 
-print("Les graphiques ont été enregistrés dans le répertoire 'analyses_bivariees'.")
+print("Les graphiques de surface brûlée mensuelle ont été enregistrés.")
 
 # Visualisation de la fréquence des incendies par mois
 plt.figure(figsize=(10, 6))
@@ -782,16 +837,15 @@ plt.ylabel("Nombre d'Incendies")
 plt.xticks(rotation=45)
 plt.tight_layout()
 
-# 📂 Sauvegarde du graphique
+# Sauvegarde du graphique
 plt.savefig(f"{save_dir}/frequence_incendies_par_mois.png")
-plt.savefig(f"{save_dir}/frequence_incendies_par_mois.pdf")
 plt.close()
 
 # Visualisation de la fréquence des incendies par saison
 # Comptage du nombre d'incendies par saison
-season_counts = df_area_non_0['season'].value_counts().reindex(['Hiver', 'Printemps', 'Été', 'Automne'])
+season_counts = df_area_non_0["season"].value_counts().reindex(["hiver", "printemps", "ete", "automne"])
 
-# 📊 Création du diagramme en barres
+# Création du diagramme en barres
 plt.figure(figsize=(8, 6))
 sns.barplot(x=season_counts.index, y=season_counts.values, palette="coolwarm")
 plt.title("Fréquence des Incendies par Saison")
@@ -800,31 +854,29 @@ plt.ylabel("Nombre d'Incendies")
 plt.xticks(rotation=0)
 plt.tight_layout()
 
-# 📂 Sauvegarde du graphique en PNG et PDF
+# Sauvegarde du graphique en PNG
 season_freq_png = os.path.join(save_dir, "frequence_incendies_saisons.png")
-season_freq_pdf = os.path.join(save_dir, "frequence_incendies_saisons.pdf")
 plt.savefig(season_freq_png)
-plt.savefig(season_freq_pdf)
 plt.close()
 
-print("Le graphique de la fréquence des incendies par saison a été enregistré dans 'analyses_bivariees'.")
+print("Le graphique de la fréquence des incendies par saison a été enregistré.")
 
-# Visualisation de la surface brûlée en fonction des coordonnées X et Y
+# Visualisation version 1 de la surface brûlée en fonction des coordonnées X et Y
 
-# Créez une figure 3D
+# Créer une figure 3D
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111, projection='3d')
 
 # Définir les données
-x = df_area_non_0['X']  # Coordonnée X
-y = df_area_non_0['Y']  # Coordonnée Y
-z = df_area_non_0['area']  # Surface brûlée (area)
+x = df_area_non_0["X"]  # Coordonnée X
+y = df_area_non_0["Y"]  # Coordonnée Y
+z = df_area_non_0["area"]  # Surface brûlée (area)
 
 # Créer un scatter plot en 3D
 ax.scatter(x, y, z, c=z, cmap='viridis', marker='o', edgecolors='k', alpha=0.7)
 
 # Ajouter les titres et les labels
-ax.set_title('Visualisation 3D de la Surface Brûlée en fonction de X et Y', fontsize=16)
+ax.set_title('V1 Visualisation 3D de la Surface Brûlée en fonction de X et Y', fontsize=16)
 ax.set_xlabel('Coordonnée X', fontsize=12)
 ax.set_ylabel('Coordonnée Y', fontsize=12)
 ax.set_zlabel('Surface Brûlée (area)', fontsize=12)
@@ -833,12 +885,9 @@ ax.set_zlabel('Surface Brûlée (area)', fontsize=12)
 cbar = plt.colorbar(ax.collections[0], ax=ax, shrink=0.5, aspect=10)
 cbar.set_label('Surface Brûlée', rotation=270, labelpad=20)
 
-# Enregistrer le graphique en .png et .pdf dans le répertoire
-png_path = os.path.join(save_dir, 'visualisation_surface_brulee.png')
-pdf_path = os.path.join(save_dir, 'visualisation_surface_brulee.pdf')
-
+# Enregistrer le graphique en .png dans le répertoire
+png_path = os.path.join(save_dir, 'visualisation_1_surface_brulee.png')
 fig.savefig(png_path, format='png', bbox_inches='tight')
-fig.savefig(pdf_path, format='pdf', bbox_inches='tight')
 
 # Fermer la figure après enregistrement
 plt.close()
@@ -846,17 +895,16 @@ plt.close()
 # Message de confirmation
 print(f"Le graphique a été enregistré dans le répertoire : {save_dir}")
 print(f"Fichier .png enregistré sous : {png_path}")
-print(f"Fichier .pdf enregistré sous : {pdf_path}")
 
-# Version avec surface de la visualisation de la surface brûlée en fonction des coordonnées X et Y
+# Version 2 avec surface de la visualisation de la surface brûlée en fonction des coordonnées X et Y
 # Créez une figure 3D
 fig = plt.figure(figsize=(10, 7))
 ax = fig.add_subplot(111, projection='3d')
 
 # Définir les données
-x = df_area_non_0['X']  # Coordonnée X
-y = df_area_non_0['Y']  # Coordonnée Y
-z = df_area_non_0['area']  # Surface brûlée (area)
+x = df_area_non_0["X"]  # Coordonnée X
+y = df_area_non_0["Y"]  # Coordonnée Y
+z = df_area_non_0["area"]  # Surface brûlée (area)
 
 # Créer une grille pour une meilleure représentation de la surface
 X_grid, Y_grid = np.meshgrid(np.unique(x), np.unique(y))
@@ -874,7 +922,7 @@ for i in range(X_grid.shape[0]):
 surf = ax.plot_surface(X_grid, Y_grid, Z_grid, cmap='viridis', edgecolor='none', alpha=0.7)
 
 # Ajouter les titres et les labels
-ax.set_title('Représentation de la Surface Brûlée en fonction de X et Y', fontsize=16)
+ax.set_title('V2 Représentation de la Surface Brûlée en fonction de X et Y', fontsize=16)
 ax.set_xlabel('Coordonnée X', fontsize=12)
 ax.set_ylabel('Coordonnée Y', fontsize=12)
 ax.set_zlabel('Surface Brûlée (area)', fontsize=12)
@@ -883,27 +931,22 @@ ax.set_zlabel('Surface Brûlée (area)', fontsize=12)
 cbar = plt.colorbar(surf, ax=ax, shrink=0.5, aspect=10)
 cbar.set_label('Surface Brûlée', rotation=270, labelpad=20)
 
-# Enregistrer le graphique en .png et .pdf dans le répertoire
-png_path = os.path.join(save_dir, 'surface_brulee_3d.png')
-pdf_path = os.path.join(save_dir, 'surface_brulee_3d.pdf')
-
-# Enregistrer les fichiers .png et .pdf
+# Enregistrer le graphique en .png dans le répertoire
+png_path = os.path.join(save_dir, 'visualisation_2_surface_brulee_3d.png')
 fig.savefig(png_path, format='png', bbox_inches='tight')
-fig.savefig(pdf_path, format='pdf', bbox_inches='tight')
 
-# Fermer la figure après l'enregistrement pour éviter toute interférence
+# Fermer la figure après l'enregistrement
 plt.close(fig)
 
 # Afficher un message de confirmation
 print(f"Le graphique a été enregistré dans le répertoire : {save_dir}")
 print(f"Fichier .png enregistré sous : {png_path}")
-print(f"Fichier .pdf enregistré sous : {pdf_path}")
 
-print("============================")
+# Version 3 avec interpolation linéaire pour obtenir surface de la visualisation de la surface brûlée en fonction des coordonnées X et Y
 # Définir les données
-x = df_area_non_0['X'].values  # Coordonnée X
-y = df_area_non_0['Y'].values  # Coordonnée Y
-z = df_area_non_0['area'].values  # Surface brûlée (area)
+x = df_area_non_0["X"].values  # Coordonnée X
+y = df_area_non_0["Y"].values  # Coordonnée Y
+z = df_area_non_0["area"].values  # Surface brûlée (area)
 
 # Créer une grille régulière pour interpolation
 grid_x, grid_y = np.meshgrid(
@@ -928,7 +971,7 @@ ax.scatter(x, y, z, c=z, cmap='inferno', edgecolors='k', s=20, alpha=1.0)
 ax.set_zlim(z.min(), z.max())
 
 # Ajouter les labels et le titre
-ax.set_title('Surface Brûlée en fonction de X et Y', fontsize=16)
+ax.set_title('V3 Surface Brûlée en fonction de X et Y', fontsize=16)
 ax.set_xlabel('Coordonnée X', fontsize=12)
 ax.set_ylabel('Coordonnée Y', fontsize=12)
 ax.set_zlabel('Surface Brûlée (area)', fontsize=12)
@@ -939,20 +982,15 @@ cbar.set_label('Surface Brûlée', rotation=270, labelpad=20)
 
 # Enregistrer le graphique
 png_path = os.path.join(save_dir, 'surface_brulee_interpolee.png')
-pdf_path = os.path.join(save_dir, 'surface_brulee_interpolee.pdf')
-
 fig.savefig(png_path, format='png', bbox_inches='tight')
-fig.savefig(pdf_path, format='pdf', bbox_inches='tight')
 
 # Fermer la figure après enregistrement
 plt.close()
 
 # Message de confirmation
-print(f"Graphique enregistré sous :\n{png_path}\n{pdf_path}")
+print(f"Graphique enregistré sous :\n{png_path}")
 
-print("============================")
-
-
+print("##################################################################################")
 
 # Visualiser la surface brûlée en fonction de la température
 plt.figure(figsize=(10, 6))
@@ -965,7 +1003,6 @@ plt.tight_layout()
 
 # 📂 Sauvegarde du graphique
 plt.savefig(f"{save_dir}/surface_brulee_vs_temperature.png")
-plt.savefig(f"{save_dir}/surface_brulee_vs_temperature.pdf")
 plt.close()
 
 # Visualistation avec axe secondaire log area
@@ -989,9 +1026,8 @@ ax2.set_ylabel("log(Surface Brûlée)", color="darkorange")
 plt.title("Surface Brûlée et log(Surface Brûlée) en Fonction de la Température")
 ax1.grid(True, linestyle="--", alpha=0.5)
 
-# 📂 Sauvegarde du graphique
+# Sauvegarde du graphique
 plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_temperature.png")
-plt.savefig(f"{save_dir}/surface_brulee_etsurfacelog_vs_temperature.pdf")
 plt.close()
 
 # Visualiser la surface brûlée en fonction de l'humidité relative
@@ -1003,9 +1039,8 @@ plt.ylabel("Surface Brûlée (ha)")
 plt.grid(True)
 plt.tight_layout()
 
-# 📂 Sauvegarde du graphique
+# Sauvegarde du graphique
 plt.savefig(f"{save_dir}/surface_brulee_vs_humidite_relative.png")
-plt.savefig(f"{save_dir}/surface_brulee_vs_humidite_relative.pdf")
 plt.close()
 
 # Visualistation avec axe secondaire log area
@@ -1029,9 +1064,8 @@ ax2.set_ylabel("log(Surface Brûlée)", color="darkorange")
 plt.title("Surface Brûlée et log(Surface Brûlée) en Fonction de la Température")
 ax1.grid(True, linestyle="--", alpha=0.5)
 
-# 📂 Sauvegarde du graphique
+# Sauvegarde du graphique
 plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_hr.png")
-plt.savefig(f"{save_dir}/surface_brulee_etsurfacelog_vs_hr.pdf")
 plt.close()
 
 # Visualiser la surface brûlée en fonction du vent
@@ -1043,9 +1077,8 @@ plt.ylabel("Surface Brûlée (ha)")
 plt.grid(True)
 plt.tight_layout()
 
-# 📂 Sauvegarde du graphique
+# Sauvegarde du graphique
 plt.savefig(f"{save_dir}/surface_brulee_vs_vent.png")
-plt.savefig(f"{save_dir}/surface_brulee_vs_vent.pdf")
 plt.close()
 
 # Visualistation avec axe secondaire log area
@@ -1069,30 +1102,30 @@ ax2.set_ylabel("log(Surface Brûlée)", color="darkorange")
 plt.title("Surface Brûlée et log(Surface Brûlée) en Fonction du Vent")
 ax1.grid(True, linestyle="--", alpha=0.5)
 
-# 📂 Sauvegarde du graphique
+# Sauvegarde du graphique
 plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_vent.png")
-plt.savefig(f"{save_dir}/surface_brulee_et_surfacelog_vs_vent.pdf")
 plt.close()
+
+print("##################################################################################")
 
 # Visualisation d'autres pairplots
 
-# 📌 Fonction de sauvegarde pour les heatmaps et pairplots
+# Fonction de sauvegarde pour les heatmaps et pairplots
 def save_figure(fig, file_name, save_dir):
     """Sauvegarde les figures sous format PNG et PDF."""
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)  # Créer le répertoire s'il n'existe pas
+    """if not os.path.exists(save_dir):
+        os.makedirs(save_dir)  # Créer le répertoire s'il n'existe pas"""
 
     fig.savefig(os.path.join(save_dir, f"{file_name}.png"), bbox_inches='tight')
-    fig.savefig(os.path.join(save_dir, f"{file_name}.pdf"), bbox_inches='tight')
     plt.close(fig)
 
 # Liste des colonnes numériques à analyser
-# 🟢 Définition des groupes de colonnes
-colonnes_normales = ['X', 'Y', 'BUI', 'temp']
-colonnes_asymetriques = ['FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind', 'rain']
+# Définition des groupes de colonnes
+colonnes_normales = ["X", "Y", "BUI", "temp", "FWI"]
+colonnes_asymetriques = ["FFMC", "DMC", "DC", "ISI", "RH", "wind", "rain"]
 
 # Affichage du pairplot pour le cas où la surface brûlée est non nulle
-pairplot_burned = sns.pairplot(df_area_non_0[colonnes_normales+ colonnes_asymetriques + ['log_area']])
+pairplot_burned = sns.pairplot(df_area_non_0[colonnes_normales + colonnes_asymetriques + ["log_area"]])
 plt.suptitle("Pairplot - Surface brûlée non nulle", y=1.02)
 save_figure(pairplot_burned.fig, "pairplot_burned", save_dir)
 
@@ -1105,18 +1138,18 @@ print("Les pairplots ont été générés et sauvegardés.")
 
 # Tracé des valeurs min, max et moyennes du FWI en fonction du mois
 
-df_grouped = df_cleaned.groupby('month')['FWI'].agg(['max', 'min', 'mean'])
+df_grouped = df_cleaned.groupby("month")["FWI"].agg(["max", "min", "mean"])
 
-# Assurez-vous que les mois sont ordonnés
+# Remettre les mois dans l'ordre calendaire
 df_grouped = df_grouped.sort_index()
 
 # Création de la figure et des axes
 plt.figure(figsize=(10, 6))
 
 # Tracer les trois courbes
-plt.plot(df_grouped.index, df_grouped['max'], label='FWI Max', color='red', marker='o')
-plt.plot(df_grouped.index, df_grouped['min'], label='FWI Min', color='blue', marker='o')
-plt.plot(df_grouped.index, df_grouped['mean'], label='FWI Moyen', color='green', marker='o')
+plt.plot(df_grouped.index, df_grouped["max"], label='FWI Max', color='red', marker='o')
+plt.plot(df_grouped.index, df_grouped["min"], label='FWI Min', color='blue', marker='o')
+plt.plot(df_grouped.index, df_grouped["mean"], label='FWI Moyen', color='green', marker='o')
 
 # Ajouter des labels, un titre et une légende
 plt.xlabel('Mois')
@@ -1124,62 +1157,62 @@ plt.ylabel('FWI')
 plt.title('FWI Max, Min et Moyen en fonction du mois')
 
 # Réordonner les mois de 1 à 12 sur l'axe x
-mois_ordre = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+mois_ordre = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 plt.xticks(ticks=df_grouped.index, labels=mois_ordre)
 
 # Ajouter la légende
 plt.legend()
 
-# Sauvegarder le graphique sous .png et .pdf
+# Sauvegarder le graphique sous .png
 plt.savefig(f'{save_dir}/fwi_courbes_en_fonction_mois_calendaire.png')
-plt.savefig(f'{save_dir}/fwi_courbes_en_fonction_mois_calendaire.pdf')
 plt.close()
+
+print("##################################################################################")
 
 # Analyses multivariées
 
 # Définir un répertoire et le créer si non encore existant
-save_dir = "analyses_multivariées"
+save_dir = "4_viken_m2icdsd_2025_b2_analyses_multivariées"
 os.makedirs(save_dir, exist_ok=True)
 
-# 🟢 Définition des groupes de colonnes
-colonnes_normales = ['X', 'Y', 'BUI', 'temp']
-colonnes_asymetriques = ['FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind', 'rain']
+# Définition des groupes de colonnes
+colonnes_normales = ["X", "Y", "BUI", "temp", "FWI"]
+colonnes_asymetriques = ["FFMC", "DMC", "DC", "ISI", "RH", "wind", "rain"]
 
-# 📊 Matrices de corrélation
-correlation_pearson = df_cleaned[['log_area']+colonnes_normales].corr(method='pearson')  # (Normales vs Normales)
-correlation_spearman_asym = df_cleaned[['log_area']+colonnes_asymetriques].corr(method='spearman')  # (Asymétriques vs Asymétriques)
-correlation_spearman_mixed = df_cleaned[['log_area']+colonnes_normales + colonnes_asymetriques].corr(method='spearman')  # (Tout en Spearman)
+# Matrices de corrélation
+correlation_pearson = df_cleaned[["log_area"]+colonnes_normales].corr(method='pearson')  # (Normales vs Normales)
+correlation_spearman_asym = df_cleaned[["log_area"]+colonnes_asymetriques].corr(method='spearman')  # (Asymétriques vs Asymétriques)
+correlation_spearman_mixed = df_cleaned[["log_area"]+colonnes_normales + colonnes_asymetriques].corr(method='spearman')  # (Tout en Spearman)
 
-# 📌 Affichage des matrices
-print("\n🔹 Matrice de Corrélation Pearson (Colonnes Normales) :\n", correlation_pearson)
-print("\n🔹 Matrice de Corrélation Spearman (Colonnes Asymétriques) :\n", correlation_spearman_asym)
-print("\n🔹 Matrice de Corrélation Spearman (Mélange Normales & Asymétriques) :\n", correlation_spearman_mixed)
+# Affichage des matrices
+print("\n🔹 Matrice de Corrélation Pearson (Colonnes Normales):\n", correlation_pearson)
+print("\n🔹 Matrice de Corrélation Spearman (Colonnes Asymétriques):\n", correlation_spearman_asym)
+print("\n🔹 Matrice de Corrélation Spearman (Mélange Normales & Asymétriques):\n", correlation_spearman_mixed)
 
-# 🔥 Création des heatmaps
+# Création des heatmaps
 fig, axes = plt.subplots(1, 3, figsize=(25, 7))
 
-# 🟢 Heatmap Pearson (Normales vs Normales)
+# Heatmap Pearson (Normales vs Normales)
 sns.heatmap(correlation_pearson, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5, ax=axes[0])
 axes[0].set_title("🔹 Matrice de Corrélation de Pearson (Colonnes Normales)")
 
-# 🔴 Heatmap Spearman (Asymétriques vs Asymétriques)
+# Heatmap Spearman (Asymétriques vs Asymétriques)
 sns.heatmap(correlation_spearman_asym, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5, ax=axes[1])
 axes[1].set_title("🔹 Matrice de Corrélation de Spearman (Colonnes Asymétriques)")
 
-# 🔄 Heatmap Spearman (Mélange Normales et Asymétriques)
+# Heatmap Spearman (Mélange Normales et Asymétriques)
 sns.heatmap(correlation_spearman_mixed, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5, ax=axes[2])
 axes[2].set_title("🔹 Matrice de Corrélation de Spearman (Tout)")
 
-# 📂 Sauvegarde des figures
+# Sauvegarde des figures
 plt.tight_layout()
 plt.savefig(f"{save_dir}/correlation_heatmaps.png")
-plt.savefig(f"{save_dir}/correlation_heatmaps.pdf")
 plt.close()
 
-# Poursuite analyses multivariées en distinguant les cas surface brûlée nulle et les cas surface brulée non nulle
+# Poursuite des analyses multivariées en distinguant les cas surface brûlée nulle et les cas surface brulée non nulle
 
 # Définir un répertoire et le créer si non encore existant
-save_dir = "analyses_multivariees_surface_brulee_0_et_non_0"
+save_dir = "5_viken_m2icdsd_2025_b2_analyses_multivariees_surface_brulee_0_et_non_0"
 os.makedirs(save_dir, exist_ok=True)
 
 # Statistiques descriptives pour les sous-groupes
@@ -1191,15 +1224,14 @@ print(df_area_0.describe())
 
 def save_heatmap(heatmap, file_name, save_dir):
     """Sauvegarde les heatmaps sous format PNG et PDF."""
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)  # Créer le répertoire s'il n'existe pas
+    """if not os.path.exists(save_dir):
+        os.makedirs(save_dir)  # Créer le répertoire s'il n'existe pas"""
 
     plt.savefig(os.path.join(save_dir, f"{file_name}.png"), bbox_inches='tight')
-    plt.savefig(os.path.join(save_dir, f"{file_name}.pdf"), bbox_inches='tight')
     plt.close()
 
 # Liste des colonnes numériques à analyser
-variables_numeriques = ['X', 'Y', 'BUI', 'temp', 'FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind', 'rain']
+variables_numeriques = ["X", "Y", "BUI", "temp", "FFMC", "DMC", "DC", "ISI", "RH", "wind", "rain", "FWI"]
 
 # Dictionnaire pour stocker les résultats de normalité
 normality_results = {"brulé": {}, "non_brulé": {}}
@@ -1220,12 +1252,9 @@ colonnes_asymetriques_brule = [var for var, is_normal in normality_results["brul
 colonnes_normales_non_brule = [var for var, is_normal in normality_results["non_brulé"].items() if is_normal]
 colonnes_asymetriques_non_brule = [var for var, is_normal in normality_results["non_brulé"].items() if not is_normal]
 
-# Création du répertoire de sauvegarde
-#save_dir = "analyses_multivariees_surface_brulee_0_et_non_0"
-
-# 📌 Corrélation Pearson pour les colonnes normales
+# Corrélation Pearson pour les colonnes normales
 if colonnes_normales_brule:
-    pearson_corr_burned = df_area_non_0[['log_area']+colonnes_normales_brule].corr(method='pearson')
+    pearson_corr_burned = df_area_non_0[["log_area"] + colonnes_normales_brule].corr(method='pearson')
     plt.figure(figsize=(10, 6))
     sns.heatmap(pearson_corr_burned, annot=True, cmap='coolwarm', vmin=-1, vmax=1, linewidths=0.5)
     plt.title("Heatmap Corrélation Pearson - Surface brûlée non nulle")
@@ -1238,9 +1267,9 @@ if colonnes_normales_non_brule:
     plt.title("Heatmap Corrélation Pearson - Surface brûlée nulle")
     save_heatmap(plt, "pearson_corr_no_burn", save_dir)
 
-# 📌 Corrélation Spearman pour les colonnes asymétriques
+# Corrélation Spearman pour les colonnes asymétriques
 if colonnes_asymetriques_brule:
-    spearman_corr_burned = df_area_non_0[['log_area']+colonnes_asymetriques_brule].corr(method='spearman')
+    spearman_corr_burned = df_area_non_0[["log_area"] + colonnes_asymetriques_brule].corr(method='spearman')
     plt.figure(figsize=(10, 6))
     sns.heatmap(spearman_corr_burned, annot=True, cmap='coolwarm', vmin=-1, vmax=1, linewidths=0.5)
     plt.title("Heatmap Corrélation Spearman - Surface brûlée non nulle")
@@ -1255,10 +1284,12 @@ if colonnes_asymetriques_non_brule:
 
 print("Les heatmaps ont été générées et sauvegardées.")
 
+print("##################################################################################")
+
 # Statistiques inférentielles pour étudier l'influence des colonnes sur la surface brûlée
 
 # Définir un répertoire et le créer si non encore existant
-save_dir = "statistiques_inférentielles"
+save_dir = "6_viken_m2icdsd_2025_b2_statistiques_inférentielles"
 os.makedirs(save_dir, exist_ok=True)
 
 # Fonction pour sauvegarder les résultats et graphiques dans un PDF
@@ -1293,7 +1324,7 @@ def save_results_to_pdf(results, save_dir, file_name="results_stats_inferentiell
     doc.build(story)
 
 # Variables à tester
-variables = ['X', 'Y', 'BUI', 'temp', 'FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind']
+variables = ["X", "Y", "BUI", "temp", "FFMC", "DMC", "DC", "ISI", "RH", "wind", "FWI"]
 
 # Pour stocker les résultats
 test_results = []
@@ -1307,7 +1338,7 @@ for var in variables:
     plt.legend()
     plt.title(f"Distribution de {var} pour chaque groupe")
 
-    # Sauvegarder l'histogramme dans le PDF
+    # Sauvegarder l'histogramme
     plt.savefig(os.path.join(save_dir, f"{var}_distribution.png"))
     plt.close()
 
@@ -1344,14 +1375,12 @@ save_results_to_pdf(test_results, save_dir, file_name="results_stats_inferentiel
 print("Les résultats ont été sauvegardés dans un fichier PDF.")
 
 # Test du Chi2
-#save_dir = "statistiques_inférentielles"
-#os.makedirs(save_dir, exist_ok=True)
 
-# 🔹 Convertir X et Y en catégories pour le test du Chi²
+# Convertir X et Y en catégories pour le test du Chi²
 df_area_non_0["X_cat"] = df_area_non_0["X"].astype("category")
 df_area_non_0["Y_cat"] = df_area_non_0["Y"].astype("category")
 
-# 🔹 Effectuer les tests du Chi² et stocker les résultats
+# Effectuer les tests du Chi² et stocker les résultats
 results = []
 
 for col in ["month", "day", "X_cat", "Y_cat"]:
@@ -1367,7 +1396,7 @@ for col in ["month", "day", "X_cat", "Y_cat"]:
     # Stocker le résultat
     results.append((col, chi2, p, dof, interpretation))
 
-# 🔹 Création du PDF
+# Création du PDF
 pdf_path = os.path.join(save_dir, "chi2_results.pdf")
 
 with PdfPages(pdf_path) as pdf:
@@ -1385,23 +1414,20 @@ with PdfPages(pdf_path) as pdf:
 
 print(f"Rapport du test du Chi² sauvegardé dans {pdf_path}")
 
-# maintenant regarder opportunité transformation log area, puis faire autres test statistiques inférentielles avec Python/R
-# puis faire si possible et autres analyses poussées pour arriver à établir relations avec paramètres météo
-# regarder les tests possibles pour savoir si relation non linéaire et l'établir
 #puis envisager de lancer des modèles types PCA, clustering, régression logistique, random forest et autres modèles avec R, Python Scikit learn et autres
 # ensuite regarder s'il faut enlever des outliers
 # regarder aussi établissement d'une échelle de risque avec les relations trouvées et FWI
 # puis faire l'injection d'une base de données propre avec données clés et trouvées et propres vers postgresql
 
-# ANOVA et test de Kruskal-Wallis pour comparer surfaces brulées selon catégories des différentes colonnes
+# ANOVA et test de Kruskal-Wallis pour comparer les surfaces brulées selon catégories des différentes colonnes
 
 # Liste des variables continues (excluant area et log_area)
-variables_continues = ['X', 'Y', 'BUI', 'temp', 'FFMC', 'DMC', 'DC', 'ISI', 'RH', 'wind']
+variables_continues = ["X", "Y", "BUI", "temp", "FFMC", "DMC", "DC", "ISI", "RH", "wind", "FWI"]
 
 # Dictionnaire pour stocker les résultats
 test_results = []
 
-# 📌 Catégorisation des variables continues en classes
+# Catégorisation des variables continues en classes
 df_area_0_cat = df_area_0.copy()
 df_area_non_0_cat = df_area_non_0.copy()
 
@@ -1409,7 +1435,7 @@ for var in variables_continues:
     df_area_0_cat[var + "_cat"] = pd.qcut(df_area_0[var], q=3, labels=["Bas", "Moyen", "Élevé"])
     df_area_non_0_cat[var + "_cat"] = pd.qcut(df_area_non_0[var], q=3, labels=["Bas", "Moyen", "Élevé"])
 
-# 📌 Séparation des variables normales et asymétriques via le test de Shapiro-Wilk
+# Séparation des variables normales et asymétriques via le test de Shapiro-Wilk
 variables_normales = []
 variables_asymetriques = []
 
@@ -1422,21 +1448,21 @@ for var in variables_continues:
     else:
         variables_asymetriques.append(var)
 
-# 📌 ANOVA pour les variables normales
+# ANOVA pour les variables normales
 for var in variables_normales:
     f_stat, p_value = stats.f_oneway(df_area_non_0[var], df_area_0[var])
     result = f"ANOVA pour {var} : F = {f_stat:.3f}, p-value = {p_value:.3f}"
     result += "\n-> Différence significative entre les groupes." if p_value < 0.05 else "\n-> Aucune différence significative."
     test_results.append(result)
 
-# 📌 Kruskal-Wallis pour les variables asymétriques
+# Kruskal-Wallis pour les variables asymétriques
 for var in variables_asymetriques:
     h_stat, p_value = stats.kruskal(df_area_non_0[var], df_area_0[var])
     result = f"Kruskal-Wallis pour {var} : H = {h_stat:.3f}, p-value = {p_value:.3f}"
     result += "\n-> Différence significative entre les groupes." if p_value < 0.05 else "\n-> Aucune différence significative."
     test_results.append(result)
 
-# 📌 Sauvegarde des résultats dans un PDF
+# Sauvegarde des résultats dans un PDF
 pdf = FPDF()
 pdf.set_auto_page_break(auto=True, margin=15)
 pdf.add_page()
@@ -1454,10 +1480,12 @@ pdf.output(pdf_file)
 
 print(f"Les résultats ont été sauvegardés dans {pdf_file}.")
 
+print("##################################################################################")
+
 # Analyses statistiques complémentaires avec R
 
 # Définir un répertoire et le créer si non encore existant
-save_dir = "analyses_statistiques_en_R"
+save_dir = "7_viken_m2icdsd_2025_b2_statistiques_complementaires_avec_R"
 os.makedirs(save_dir, exist_ok=True)
 
 # Activer la conversion entre pandas et R
@@ -1473,31 +1501,31 @@ forecast = importr('forecast')
 # Convertir le dataframe pandas en dataframe R
 df_r = pandas2ri.py2rpy(df_cleaned)
 
-# 1. Test de normalité (Shapiro-Wilk et Kolmogorov-Smirnov) sur FWI
-print("\nTest de normalité en R :")
+# Test de normalité (Shapiro-Wilk et Kolmogorov-Smirnov) sur FWI
+print("\nTest de normalité en R: ")
 shapiro_test = stats.shapiro_test(df_r.rx2("FWI"))
-ks_test = stats.ks_test(df_r.rx2("FWI"), "pnorm", mean=df_cleaned['FWI'].mean(), sd=df_cleaned['FWI'].std())
-print(f"Shapiro-Wilk p-value : {shapiro_test[1]}")
-print(f"Kolmogorov-Smirnov p-value : {ks_test[1]}")
+ks_test = stats.ks_test(df_r.rx2("FWI"), "pnorm", mean=df_cleaned["FWI"].mean(), sd=df_cleaned["FWI"].std())
+print(f"Shapiro-Wilk p-value: {shapiro_test[1]}")
+print(f"Kolmogorov-Smirnov p-value: {ks_test[1]}")
 
-# 2. ANOVA (Analyse de la variance) pour tester les différences entre les saisons
-print("\nAnalyse de la variance (ANOVA) en R entre FWI et season:")
+# ANOVA (Analyse de la variance) pour tester les différences entre les saisons
+print("\nAnalyse de la variance (ANOVA) en R entre FWI et season: ")
 anova_model = stats.aov(r('FWI ~ season'), data=df_r)
 print(base.summary(anova_model))
 anova_summary = base.summary(anova_model)
 
 # Ouvrir un fichier texte pour sauvegarder les résultats
-with open("resultats_tests_R_normalite_ANOVA.txt", "w", encoding="utf-8") as file:
+with open("8_viken_m2icdsd_2025_b2_resultats_tests_R_normalite_ANOVA.txt", "w", encoding="utf-8") as file:
     # Écrire les résultats du test de normalité (Shapiro-Wilk et Kolmogorov-Smirnov)
     file.write("===== Test de normalité en R =====\n")
-    file.write(f"Shapiro-Wilk p-value : {shapiro_test[1]}\n")
-    file.write(f"Kolmogorov-Smirnov p-value : {ks_test[1]}\n")
+    file.write(f"Shapiro-Wilk p-value: {shapiro_test[1]}\n")
+    file.write(f"Kolmogorov-Smirnov p-value: {ks_test[1]}\n")
 
-    # Écrire les résultats de l'ANOVA
+    # Ecrire les résultats de l'ANOVA
     file.write("\n===== Analyse de la variance (ANOVA) =====\n")
     file.write(str(anova_summary))  # L'ANOVA génère un résumé qui peut être écrit directement en texte
 
-print("Les résultats ont été sauvegardés dans le fichier 'resultats_tests.txt'.")
+print("Les résultats ont été sauvegardés.")
 
 # 3. Régression non linéaire (polynomiale) entre FWI et Température
 print("\nRégression polynomiale en R :")
@@ -1505,24 +1533,14 @@ poly_model = stats.lm(r('FWI ~ poly(temp, 2)'), data=df_r)
 print(base.summary(poly_model))
 poly_summary = base.summary(poly_model)
 
-
 # 4. Régression linéaire multiple entre Température et Humidité relative (avec la surface brûlée non nulle)
 df_r_area_non_0 = pandas2ri.py2rpy(df_area_non_0)
 
 # temp et rh sont les variables explicatives
 print("\nRégression multiple en R : Température et Humidité relative sur surface brûlée non nulle")
 
-# Passer l'objet à R pour la transformation et le modèle
-#r('df_r_area_non_0 <- ' + str(df_r_area_non_0))  # Importer correctement le DataFrame dans R
-
-# Transformer 'RH' en log(RH) car distribution asymétrique
-#r('df_r_area_non_0$log_RH <- log(df_r_area_non_0$RH)')
-
 # Créer le modèle de régression linéaire multiple
 lm_model_rh_temp = r.lm('log_area ~ temp + RH', data=df_r_area_non_0)
-
-# Afficher le résumé du modèle
-#print(r.summary(lm_model_rh_temp))
 
 # Résumé du modèle
 print(base.summary(lm_model_rh_temp))
@@ -1539,7 +1557,7 @@ print(base.summary(lm_model_temp_bui))
 lm_summary_temp_bui = base.summary(lm_model_temp_bui)
 
 # Sauvegarde des résultats dans un fichier texte
-with open("regressions_polynom_multiple_results.txt", "w", encoding="utf-8") as file:
+with open("9_viken_m2icdsd_2025_b2_regressions_polynom_multiple_results.txt", "w", encoding="utf-8") as file:
     # Régression polynomiale entre FWI et Température
     file.write("\n===== Régression Polynomiale entre FWI et Température =====\n")
     file.write(str(poly_summary))  # Résumé du modèle de régression polynomiale
@@ -1553,16 +1571,18 @@ with open("regressions_polynom_multiple_results.txt", "w", encoding="utf-8") as 
     file.write("\n===== Régression Multiple entre BUI et Température sur Surface Brûlée =====\n")
     file.write(str(lm_summary_temp_bui))  # Résumé du modèle de régression multiple avec BUI et Température
 
-# Test modèles
+# Test de modèles
+
 # Random Forest
-print("=================Essai Tests modèles=======================")
+
+print("=================Essai Tests de modèles=======================")
 
 # Régression avec random forest pour comprendre importance de wind et FFMC dans la prédiction de l'indice ISI
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['ISI', 'wind', 'FFMC']]
+df_selected = df_area_non_0[["ISI", "wind", "FFMC"]]
 
 # Vérifier les types de données
 print(df_selected.dtypes)
@@ -1586,13 +1606,13 @@ importance = ro.r('importance(rf_model)')
 print(importance)
 
 # Convertir l'importance en dataframe R
-importance_r_df = ro.r['data.frame'](importance)
+importance_r_df = ro.r["data.frame"](importance)
 
 # Convertir l'objet importance_r_df en un DataFrame pandas
 importance_df = pandas2ri.rpy2py(importance_r_df)
 
 # Sauvegarde des résultats dans un fichier texte
-with open("ISI_tilde_wind_FFMC_random_forest_results.txt", "w", encoding="utf-8") as file:
+with open("10_viken_m2icdsd_2025_b2_ISI_tilde_wind_FFMC_random_forest_results.txt", "w", encoding="utf-8") as file:
     # Modèle Random Forest
     file.write("================= Modèle Random Forest =================\n")
     file.write(str(rf_model))  # Résumé du modèle Random Forest
@@ -1602,12 +1622,11 @@ with open("ISI_tilde_wind_FFMC_random_forest_results.txt", "w", encoding="utf-8"
     file.write("================= Importance des Variables =================\n")
     file.write(importance_df.to_string())  # Importance des variables dans le modèle Random Forest
 
-
 # Afficher la courbe directement dans Python
 ro.r('plot(rf_model)')
 
 # Définir un fichier de sortie pour le graphique
-file_path = "essairforestun.png"
+file_path = "11_viken_m2icdsd_2025_b2_essairforestun.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1617,16 +1636,19 @@ ro.r(f'''
 ''')
 
 print("===========================================")
-# Entraînement d'un modèle random forest pour prédire variable cible ISI en fonction de wind et FFMC, mesure de leur contribution à la réduction de l'erreur de prédiction
-#puis prédiction de l'ISI sur les données d'entraînement et visualisation des résultats
+
+# Entraînement d'un modèle random forest pour prédire variable cible ISI en fonction de wind et FFMC,
+# mesure de leur contribution à la réduction de l'erreur de prédiction
+# puis prédiction de l'ISI sur les données d'entraînement et visualisation des résultats
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['ISI', 'wind', 'FFMC']]
+df_selected = df_area_non_0[["ISI", "wind", "FFMC"]]
 
-# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
-y_true = df_selected['ISI']
+# Ajouter la colonne des vraies valeurs "ISI" dans le DataFrame
+y_true = df_selected["ISI"]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -1651,7 +1673,6 @@ print(importance)
 # Obtenir l'importance des variables sous forme de data.frame R
 importance_r = ro.r('as.data.frame(importance(rf_model))')  # Convertir en data.frame
 
-
 # Convertir l'importance (qui est un R object) en DataFrame pandas
 importance_df = pandas2ri.rpy2py(importance_r)
 
@@ -1660,14 +1681,14 @@ y_pred_r = ro.r('predict(rf_model, df_r)')
 y_pred_list = list(y_pred_r)  # Convertir en liste
 
 # Convertir les prédictions en DataFrame pandas
-y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
+y_pred_df = pd.DataFrame(y_pred_list, columns=["Predictions"])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$ISI')
 
 # Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
 y_true_df = pd.DataFrame(y_true)
-y_true_df['Predictions'] = y_pred_df
+y_true_df["Predictions"] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1683,7 +1704,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "essai_random_forest_isi_prediction_vs_true.png"
+file_path = "12_viken_m2icdsd_2025_b2_essai_random_forest_isi_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1696,24 +1717,27 @@ ro.r(f'''
 ''')
 
 # Sauvegarder les résultats dans un fichier texte
-with open("essai_random_forest_results_et_pred_ISI_tilde_wind_FFMC.txt", "w", encoding="utf-8") as file:
-    file.write("================= Résultats du modèle Random Forest ISI tilde wind FFMC =================\n")
+with open("13_viken_m2icdsd_2025_b2_essai_random_forest_results_et_pred_ISI_tilde_wind_FFMC.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest ISI tilde wind, FFMC =================\n")
     file.write("\nImportance des variables :\n")
     file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
     file.write("\n\n===== Prédictions du modèle =====\n")
     file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
 print("===========================================")
-# Entraînement d'un model random forest pour prédire le FWI en fonction de temp, wind et rh , mesurer l'impact de chaque variable sur la prédiction,
-# et comparer les prédiction du modèle avec les vraies valeurs du FWI à l'aide d'une courbe
+
+# Entraînement d'un model random forest pour prédire le FWI en fonction de temp, wind et rh ,
+# mesurer l'impact de chaque variable sur la prédiction,
+# puis comparer les prédictions du modèle avec les vraies valeurs du FWI à l'aide d'une courbe
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['FWI', 'temp', 'wind', 'RH']]
+df_selected = df_area_non_0[["FWI", "temp", "wind", "RH"]]
 
-# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
-y_true = df_selected['FWI']
+# Ajouter la colonne des vraies valeurs "ISI" dans le DataFrame
+y_true = df_selected["FWI"]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -1721,7 +1745,7 @@ ro.globalenv["df_r"] = df_r  # Assigner df_r dans l'environnement R
 ro.globalenv["y_true"] = pandas2ri.py2rpy(y_true)  # Assigner y_true dans l'environnement R
 
 # Charger la bibliothèque randomForest en R
-randomForest = importr("randomForest")
+#randomForest = importr("randomForest")
 
 # Exécuter le Random Forest en R
 rf_model = ro.r('''
@@ -1753,7 +1777,7 @@ y_true_r = ro.r('df_r$FWI')
 
 # Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
 y_true_df = pd.DataFrame(y_true)
-y_true_df['Predictions'] = y_pred_df
+y_true_df["Predictions"] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1769,7 +1793,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "essai_random_forest_fwi_prediction_vs_true.png"
+file_path = "14_viken_m2icdsd_2025_b2_essai_random_forest_fwi_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1782,27 +1806,27 @@ ro.r(f'''
 ''')
 
 # Sauvegarder les résultats dans un fichier texte
-with open("essai_random_forest_results_et_pred_FWI_tilde_temp_wind_RH.txt", "w", encoding="utf-8") as file:
-    file.write("================= Résultats du modèle Random Forest FWI tilde temp wind RH =================\n")
+with open("15_viken_m2icdsd_2025_b2_essai_random_forest_results_et_pred_FWI_tilde_temp_wind_RH.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest FWI tilde temp, wind, RH =================\n")
     file.write("\nImportance des variables :\n")
     file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
     file.write("\n\n===== Prédictions du modèle =====\n")
     file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
-
-
 print("===========================================")
-# Entraînement d'un modèle random forest pour prédire la surface brûlée area en fonction de 'FFMC' et 'ISI',
-# détermination de la l'importance de chaque variable dans la prédiction de area et comparer les prédictions du modèle avec
-# les vraies valeurs de area
+
+# Entraînement d'un modèle random forest pour prédire la surface brûlée area en fonction de "FFMC" et "ISI",
+# détermination de la l'importance de chaque variable dans la prédiction de "area"
+# puis comparer les prédictions du modèle avec les vraies valeurs de "area"
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['area', 'FFMC', 'ISI']]
+df_selected = df_area_non_0[["area", "FFMC", "ISI"]]
 
-# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
-y_true = df_selected['area']
+# Ajouter la colonne des vraies valeurs "ISI" dans le DataFrame
+y_true = df_selected["area"]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -1835,14 +1859,14 @@ y_pred_r = ro.r('predict(rf_model, df_r)')
 y_pred_list = list(y_pred_r)  # Convertir en liste
 
 # Convertir les prédictions en DataFrame pandas
-y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
+y_pred_df = pd.DataFrame(y_pred_list, columns=["Predictions"])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$area')
 
 # Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
 y_true_df = pd.DataFrame(y_true)
-y_true_df['Predictions'] = y_pred_df
+y_true_df["Predictions"] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1858,7 +1882,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "essai_random_forest_area_tilde_FFMC_ISI_prediction_vs_true.png"
+file_path = "16_viken_m2icdsd_2025_b2_essai_random_forest_area_tilde_FFMC_ISI_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1871,27 +1895,27 @@ ro.r(f'''
 ''')
 
 # Sauvegarder les résultats dans un fichier texte
-with open("essai_random_forest_results_et_pred_area_tilde_FFMC_ISI.txt", "w", encoding="utf-8") as file:
-    file.write("================= Résultats du modèle Random Forest area tilde FFMC ISI =================\n")
+with open("17_viken_m2icdsd_2025_b2_essai_random_forest_results_et_pred_area_tilde_FFMC_ISI.txt", "w", encoding="utf-8") as file:
+    file.write("================= Résultats du modèle Random Forest area tilde FFMC, ISI =================\n")
     file.write("\nImportance des variables :\n")
     file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
     file.write("\n\n===== Prédictions du modèle =====\n")
     file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
-
-
 print("===========================================")
-# Entraînement d'un modèle random forest pour prédire la surface brûlée area en fonction de 'DMC' et 'DC',
-# détermination de la l'importance de chaque variable dans la prédiction de area et comparer les prédictions du modèle avec
-# les vraies valeurs de area
+
+# Entraînement d'un modèle random forest pour prédire la surface brûlée area en fonction de "DMC" et "DC",
+# détermination de la l'importance de chaque variable dans la prédiction de "area"
+# puis comparer les prédictions du modèle avec les vraies valeurs de "area"
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['area', 'DMC', 'DC']]
+df_selected = df_area_non_0[["area", "DMC", "DC"]]
 
 # Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
-y_true = df_selected['area']
+y_true = df_selected["area"]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -1924,14 +1948,14 @@ y_pred_r = ro.r('predict(rf_model, df_r)')
 y_pred_list = list(y_pred_r)  # Convertir en liste
 
 # Convertir les prédictions en DataFrame pandas
-y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
+y_pred_df = pd.DataFrame(y_pred_list, columns=["Predictions"])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$area')
 
 # Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
 y_true_df = pd.DataFrame(y_true)
-y_true_df['Predictions'] = y_pred_df
+y_true_df["Predictions"] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -1947,7 +1971,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "area_DMC_DC_prediction_vs_true.png"
+file_path = "18_viken_m2icdsd_2025_b2_area_DMC_DC_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -1960,7 +1984,7 @@ ro.r(f'''
 ''')
 
 # Sauvegarder les résultats dans un fichier texte
-with open("essai_random_forest_results_et_pred_area_tilde_DMC_DC.txt", "w", encoding="utf-8") as file:
+with open("19_viken_m2icdsd_2025_b2_essai_random_forest_results_et_pred_area_tilde_DMC_DC.txt", "w", encoding="utf-8") as file:
     file.write("================= Résultats du modèle Random Forest area tilde DMC DC =================\n")
     file.write("\nImportance des variables :\n")
     file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
@@ -1969,17 +1993,19 @@ with open("essai_random_forest_results_et_pred_area_tilde_DMC_DC.txt", "w", enco
 
 
 print("===========================================")
-# Entraînement d'un modèle random forest pour prédire le FFMC en fonction de 'temp' et 'RH',
-# détermination de l'importance de chaque variable dans la prédiction du FFMC et comparer les prédictions du modèle avec
-# les vraies valeurs du FFMC
+
+# Entraînement d'un modèle random forest pour prédire le FFMC en fonction de "temp" et "RH",
+# détermination de l'importance de chaque variable dans la prédiction du FFMC
+# puis comparer les prédictions du modèle avec les vraies valeurs du FFMC
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['FFMC', 'temp', 'RH']]
+df_selected = df_area_non_0[["FFMC", "temp", "RH"]]
 
-# Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
-y_true = df_selected['FFMC']
+# Ajouter la colonne des vraies valeurs "ISI" dans le DataFrame
+y_true = df_selected["FFMC"]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2012,14 +2038,14 @@ y_pred_r = ro.r('predict(rf_model, df_r)')
 y_pred_list = list(y_pred_r)  # Convertir en liste
 
 # Convertir les prédictions en DataFrame pandas
-y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
+y_pred_df = pd.DataFrame(y_pred_list, columns=["Predictions"])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$FFMC')
 
 # Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
 y_true_df = pd.DataFrame(y_true)
-y_true_df['Predictions'] = y_pred_df
+y_true_df["Predictions"] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -2035,7 +2061,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "FFMC_tilde_temp_RH_prediction_vs_true.png"
+file_path = "20_viken_m2icdsd_2025_b2_FFMC_tilde_temp_RH_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -2048,7 +2074,7 @@ ro.r(f'''
 ''')
 
 # Sauvegarder les résultats dans un fichier texte
-with open("essai_random_forest_results_et_pred_FFMC_tilde_temp_RH.txt", "w", encoding="utf-8") as file:
+with open("21_viken_m2icdsd_2025_b2_essai_random_forest_results_et_pred_FFMC_tilde_temp_RH.txt", "w", encoding="utf-8") as file:
     file.write("================= Résultats du modèle Random Forest FFMC tilde temp RH =================\n")
     file.write("\nImportance des variables :\n")
     file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
@@ -2056,17 +2082,19 @@ with open("essai_random_forest_results_et_pred_FFMC_tilde_temp_RH.txt", "w", enc
     file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
 print("===========================================")
-# Entraînement d'un modèle random forest pour prédire le DC en fonction de 'wind' et 'RH',
-# détermination de l'importance de chaque variable dans la prédiction du DC et comparer les prédictions du modèle avec
-# les vraies valeurs du DC
+
+# Entraînement d'un modèle random forest pour prédire le DC en fonction de "wind" et "RH",
+# détermination de l'importance de chaque variable dans la prédiction du DC
+# puis comparer les prédictions du modèle avec les vraies valeurs du DC
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['DC', 'wind', 'RH']]
+df_selected = df_area_non_0[["DC", "wind", "RH"]]
 
 # Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
-y_true = df_selected['DC']
+y_true = df_selected["DC"]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2099,14 +2127,14 @@ y_pred_r = ro.r('predict(rf_model, df_r)')
 y_pred_list = list(y_pred_r)  # Convertir en liste
 
 # Convertir les prédictions en DataFrame pandas
-y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
+y_pred_df = pd.DataFrame(y_pred_list, columns=["Predictions"])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$DC')
 
 # Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
 y_true_df = pd.DataFrame(y_true)
-y_true_df['Predictions'] = y_pred_df
+y_true_df["Predictions"] = y_pred_df
 
 # Tracer le graphique directement en R
 ro.r('''
@@ -2122,7 +2150,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "random_forest_DC_tilde_wind_RH_prediction_vs_true.png"
+file_path = "22_viken_m2icdsd_2025_b2_random_forest_DC_tilde_wind_RH_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -2135,27 +2163,27 @@ ro.r(f'''
 ''')
 
 # Sauvegarder les résultats dans un fichier texte
-with open("essai_random_forest_results_et_pred_DC_tilde_wind_RH.txt", "w", encoding="utf-8") as file:
+with open("23_viken_m2icdsd_2025_b2_essai_random_forest_results_et_pred_DC_tilde_wind_RH.txt", "w", encoding="utf-8") as file:
     file.write("================= Résultats du modèle Random Forest DC tilde wind RH =================\n")
     file.write("\nImportance des variables :\n")
     file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
     file.write("\n\n===== Prédictions du modèle =====\n")
     file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
-# Entraînement d'un modèle random forest pour prédire la surface brûlée (version transformation logarithmique) log_area  en fonction de 'temp', 'RH', 'wind', 'BUI', 'FWI',
-# 'ISI, 'DC'
-# détermination de l'importance de chaque variable dans la prédiction de log_area et comparer les prédictions du modèle avec
-# les vraies valeurs de log_area
-print("===================================")
-print("Essai de régression entre 'log_area' et 'temperature', 'RH', 'wind', 'BUI', 'FWI', 'ISI', 'DC'")
+# Entraînement d'un modèle random forest pour prédire la surface brûlée (version transformation logarithmique) log_area en fonction de
+# "temp", "RH", "wind", "BUI", "FWI", "ISI", "DC" pour détermination de l'importance de chaque variable dans la prédiction de log_area
+# puis comparer les prédictions du modèle avec les vraies valeurs de log_area
+
+print("==========Essai de régression entre 'log_area' et 'temperature', 'RH', 'wind', 'BUI', 'FWI', 'ISI', 'DC'=============")
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['log_area', 'temp', 'RH', 'wind', 'BUI', 'FWI', 'ISI', 'DC']]
+df_selected = df_area_non_0[["log_area", "temp", "RH", "wind", "BUI", "FWI", "ISI", "DC"]]
 
 # Ajouter la colonne des vraies valeurs 'ISI' dans le DataFrame
-y_true = df_selected['log_area']
+y_true = df_selected["log_area"]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2189,14 +2217,14 @@ y_pred_r = ro.r('predict(rf_model, df_r)')
 y_pred_list = list(y_pred_r)  # Convertir en liste
 
 # Convertir les prédictions en DataFrame pandas
-y_pred_df = pd.DataFrame(y_pred_list, columns=['Predictions'])
+y_pred_df = pd.DataFrame(y_pred_list, columns=["Predictions"])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_r
 y_true_r = ro.r('df_r$log_area')
 
 # Créer un DataFrame pour les vraies valeurs (y_true) et les prédictions (y_pred)
 y_true_df = pd.DataFrame(y_true)
-y_true_df['Predictions'] = y_pred_df
+y_true_df["Predictions"] = y_pred_df
 
 # Tracer le graphique directement en R (valeurs prédites vs réelles)
 ro.r('''
@@ -2212,7 +2240,7 @@ ro.r('''
 '''.format(','.join(map(str, y_true_r)), ','.join(map(str, y_pred_r))))
 
 # Sauvegarder le graphique dans un fichier PNG
-file_path = "random_forest_log_area_tilde_meteo_indices_prediction_vs_true.png"
+file_path = "24_viken_m2icdsd_2025_b2_random_forest_log_area_tilde_meteo_indices_prediction_vs_true.png"
 
 # Sauvegarder la courbe dans un fichier PNG
 ro.r(f'''
@@ -2225,16 +2253,16 @@ ro.r(f'''
 ''')
 
 # Sauvegarder les résultats dans un fichier texte
-with open("essai_random_forest_results_et_pred_log_area_tilde_meteo_indices.txt", "w", encoding="utf-8") as file:
+with open("25_viken_m2icdsd_2025_b2_essai_random_forest_results_et_pred_log_area_tilde_meteo_indices.txt", "w", encoding="utf-8") as file:
     file.write("================= Résultats du modèle Random Forest log_area tilde meteo indices =================\n")
     file.write("\nImportance des variables :\n")
     file.write(importance_df.to_string())  # Écrire l'importance des variables dans le fichier
     file.write("\n\n===== Prédictions du modèle =====\n")
     file.write(y_true_df.to_string())  # Écrire les vraies valeurs et les prédictions dans le fichier
 
-# Régression GAM (modèle additif généralisé) pour prédire la surface brûlée area à partir de 'DMC' et 'DC' puis
-# courbe de comparaison entre valeur prédite et valeur réelle
-print("===========================================")
+# Test d'une régression GAM (modèle additif généralisé) pour prédire la surface brûlée "area" à partir de "DMC" et "DC"
+# puis courbe de comparaison entre valeur prédite et valeur réelle
+
 # Activer la conversion automatique Pandas -> R DataFrame
 pandas2ri.activate()
 
@@ -2242,7 +2270,7 @@ pandas2ri.activate()
 mgcv = importr("mgcv")
 
 # Sélectionner uniquement les colonnes nécessaires
-df_selected = df_area_non_0[['area', 'DMC', 'DC']]
+df_selected = df_area_non_0[["area", "DMC", "DC"]]
 
 # Convertir en DataFrame R et assigner dans l'environnement R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2265,14 +2293,14 @@ anova_result = ro.r('anova(gam_model)')
 y_pred_r = ro.r('predict(gam_model, df_r)')
 
 # Convertir les prédictions en DataFrame pandas
-y_pred_df = pd.DataFrame(list(y_pred_r), columns=['Predictions'])
+y_pred_df = pd.DataFrame(list(y_pred_r), columns=["Predictions"])
 
 # Obtenir les vraies valeurs (y_true) directement depuis df_selected
-y_true_df = df_selected[['area']].reset_index(drop=True)
-y_true_df['Predictions'] = y_pred_df  # Ajouter les prédictions
+y_true_df = df_selected[["area"]].reset_index(drop=True)
+y_true_df["Predictions"] = y_pred_df  # Ajouter les prédictions
 
 # Sauvegarder les résultats dans un fichier texte
-file_path_txt = "gam_results_predictions_area_tilde_DMC_DC.txt"
+file_path_txt = "26_viken_m2icdsd_2025_b2_gam_results_predictions_area_tilde_DMC_DC.txt"
 with open(file_path_txt, "w", encoding="utf-8") as file:
     file.write("================= Résultats du modèle GAM area ~ DMC + DC =================\n\n")
     file.write("=== Résumé du modèle GAM ===\n")
@@ -2285,7 +2313,7 @@ with open(file_path_txt, "w", encoding="utf-8") as file:
 print(f"Résultats enregistrés dans {file_path_txt}")
 
 # Tracer le graphique directement en R et l'enregistrer
-file_path_png = "gam_prediction_vs_true_area_tilde_DMC_DC.png"
+file_path_png = "27_viken_m2icdsd_2025_b2_gam_prediction_vs_true_area_tilde_DMC_DC.png"
 ro.r(f'''
     png("{file_path_png}", width=800, height=600)
     plot(df_r$area, predict(gam_model, df_r), 
@@ -2299,50 +2327,10 @@ ro.r(f'''
 print(f"Graphique enregistré sous {file_path_png}")
 
 print("============== Essai Clustering hiérarchique====================")
-# Activer la conversion Pandas -> R DataFrame
-#pandas2ri.activate()
-
-# Sélectionner les colonnes pertinentes du DataFrame
-#df_selected = df_area_non_0[['temp', 'wind', 'RH', 'DC', 'DMC', 'ISI', 'BUI', 'FWI', 'FFMC', 'area']]
-
-# Convertir le DataFrame Pandas en DataFrame R
-#df_r = pandas2ri.py2rpy(df_selected)
-
-# Normaliser les données
-#ro.r('''
-#  df_r_scaled <- scale(df_r)
-#''')
-
-# Effectuer le clustering hiérarchique
-#ro.r('''
-#  dist_matrix <- dist(df_r_scaled)  # Calculer la matrice de distances
-#  hc <- hclust(dist_matrix, method="ward.D2")  # Clustering hiérarchique avec méthode Ward
-#''')
-
-# Visualiser le dendrogramme
-#ro.r('''
-#  plot(hc, main="Dendrogramme - Clustering Hiérarchique", xlab="", sub="", cex=0.9)
-#''')
-
-#Sauvegarder le dendrogramme en PNG
-#save_dir = "analyses_bivariées"
-#os.makedirs(save_dir, exist_ok=True)
-
-# Sauvegarder le graphique dans un fichier PNG
-#file_path = "dendrogramme_clustering.png"
-
-#ro.r(f'png("{file_path}", width=1500, height=1200)')
-#ro.r('plot(hc, main="Dendrogramme - Clustering Hiérarchique", xlab="", sub="", cex=0.9)')
-#ro.r('dev.off()')
-
-#print(f"Le dendrogramme a été sauvegardé.")
-
-#graphics = importr('graphics')
-
 print("=================Clustering ward avec X,Y,ISI,FWI,area non nulle=========================")
 
 # Sélectionner les colonnes nécessaires
-df_selected = df_area_non_0[['X', 'Y', 'ISI', 'FWI', 'area']]
+df_selected = df_area_non_0[["X", "Y", "ISI", "FWI", "area"]]
 
 # Convertir en DataFrame R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2363,13 +2351,13 @@ ro.r('''
     df_r$cluster <- as.factor(clusters)
 
     # Tracer le dendrogramme et sauvegarder en fichier PNG
-    png("dendrogramme_clustering_2.png", width = 800, height = 600)
+    png("28_viken_m2icdsd_2025_b2_dendrogramme_clustering_area_non_0_sanstempRHwind.png", width = 800, height = 600)
     plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
     dev.off()
 ''')
 
 # Sauvegarder le dendrogramme
-print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_non_0_sanstempRHwind.png'.")
+print("Le dendrogramme a été sauvegardé dans le fichier '28_viken_m2icdsd_2025_b2_dendrogramme_clustering_area_non_0_sanstempRHwind.png'.")
 
 # Visualiser les clusters avec un scatter plot
 ro.r('''
@@ -2397,7 +2385,7 @@ ro.r('''
         
 
     # Sauvegarder le scatter plot dans un fichier PNG
-    ggsave("visualisation_clusters_white_area_non_0_sanstempRHwind.png", plot = p, width = 8, height = 6)
+    ggsave("29_viken_m2icdsd_2025_b2_visualisation_clusters_white_area_non_0_sanstempRHwind.png", plot = p, width = 8, height = 6)
 ''')
 
 # Message de confirmation pour la visualisation
@@ -2450,7 +2438,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot ISI
-    ggsave("boxplot_isi_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p1, width = 8, height = 6)
+    ggsave("30_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p1, width = 8, height = 6)
 
     # Boxplot pour FWI
     p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
@@ -2468,7 +2456,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot FWI
-    ggsave("boxplot_fwi_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p2, width = 8, height = 6)
+    ggsave("31_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p2, width = 8, height = 6)
 
     # Boxplot pour Surface Brûlée (area)
     p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
@@ -2486,14 +2474,14 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot Surface Brûlée
-    ggsave("boxplot_area_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p3, width = 8, height = 6)
+    ggsave("32_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_white_area_non_0_sanstempRHwind.png", plot = p3, width = 8, height = 6)
 ''')
 
 # Message de confirmation
 print("Les boxplots ont été sauvegardés sous les noms suivants :")
-print("1. Boxplot ISI : boxplot_isi_by_cluster_area_non_0_sanstempRHwind.png")
-print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_non_0_sanstempRHwind.png")
-print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_non_0_sanstempRHwind.png")
+print("1. Boxplot ISI : 29_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_area_non_0_sanstempRHwind.png")
+print("2. Boxplot FWI : 31_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_area_non_0_sanstempRHwind.png")
+print("3. Boxplot Surface Brûlée : 32_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_area_non_0_sanstempRHwind.png")
 
 # analyse des points du cluster 3
 ro.r('''
@@ -2517,7 +2505,7 @@ dist_points_r = ro.r['dist_points_df']
 dist_points_df = pandas2ri.rpy2py(dist_points_r)
 
 # Sauvegarde des résultats dans un fichier texte
-with open("statistiques_par_cluster_area_non_0_sanstemprhwind.txt", "w", encoding="utf-8") as file:
+with open("33_viken_m2icdsd_2025_b2_statistiques_par_cluster_area_non_0_sanstemprhwind.txt", "w", encoding="utf-8") as file:
     file.write("===== Statistiques Descriptives par Cluster (surface brûlée non nulle, sans temp, RH et wind) =====\n")
     file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
     file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
@@ -2529,7 +2517,7 @@ with open("statistiques_par_cluster_area_non_0_sanstemprhwind.txt", "w", encodin
 print("=================Clustering ward avec X,Y,ISI,FWI, temp, RH, wind, area non nulle =========================")
 
 # Sélectionner les colonnes nécessaires
-df_selected = df_area_non_0[['X', 'Y', 'ISI', 'FWI', 'temp', 'RH', 'wind', 'area']]
+df_selected = df_area_non_0[["X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area"]]
 
 # Convertir en DataFrame R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2550,13 +2538,13 @@ ro.r('''
     df_r$cluster <- as.factor(clusters)
 
     # Tracer le dendrogramme et sauvegarder en fichier PNG
-    png("dendrogramme_clustering_areanon0_avecmeteo.png", width = 800, height = 600)
+    png("34_viken_m2icdsd_2025_b2_dendrogramme_clustering_areanon0_avecmeteo.png", width = 800, height = 600)
     plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
     dev.off()
 ''')
 
 # Sauvegarder le dendrogramme
-print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_non_0_avecmeteo.png'.")
+print("Le dendrogramme a été sauvegardé dans le fichier '34_viken_m2icdsd_2025_b2_dendrogramme_clustering_area_non_0_avecmeteo.png'.")
 
 # Visualiser les clusters avec un scatter plot
 ro.r('''
@@ -2584,7 +2572,7 @@ ro.r('''
 
 
     # Sauvegarder le scatter plot dans un fichier PNG
-    ggsave("visualisation_clusters_white_area_non_0_avecmeteo.png", plot = p, width = 8, height = 6)
+    ggsave("35_viken_m2icdsd_2025_b2_visualisation_clusters_white_area_non_0_avecmeteo.png", plot = p, width = 8, height = 6)
 ''')
 
 # Message de confirmation pour la visualisation
@@ -2637,7 +2625,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot ISI
-    ggsave("boxplot_isi_by_cluster_white_area_non_0_avecmeteo.png", plot = p1, width = 8, height = 6)
+    ggsave("36_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_white_area_non_0_avecmeteo.png", plot = p1, width = 8, height = 6)
 
     # Boxplot pour FWI
     p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
@@ -2655,7 +2643,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot FWI
-    ggsave("boxplot_fwi_by_cluster_white_area_non_0_avecmeteo.png", plot = p2, width = 8, height = 6)
+    ggsave("37_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_white_area_non_0_avecmeteo.png", plot = p2, width = 8, height = 6)
 
     # Boxplot pour Surface Brûlée (area)
     p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
@@ -2673,14 +2661,14 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot Surface Brûlée
-    ggsave("boxplot_area_by_cluster_white_area_non_0_avecmeteo.png", plot = p3, width = 8, height = 6)
+    ggsave("38_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_white_area_non_0_avecmeteo.png", plot = p3, width = 8, height = 6)
 ''')
 
 # Message de confirmation
 print("Les boxplots ont été sauvegardés sous les noms suivants :")
-print("1. Boxplot ISI : boxplot_isi_by_cluster_area_non_0_avecmeteo.png")
-print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_non_0_avecmeteo.png")
-print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_non_0_avecmeteo.png")
+print("1. Boxplot ISI : 36_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_area_non_0_avecmeteo.png")
+print("2. Boxplot FWI : 37_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_area_non_0_avecmeteo.png")
+print("3. Boxplot Surface Brûlée : 38_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_area_non_0_avecmeteo.png")
 
 # analyse des points du cluster 3
 dist_points = ro.r('''
@@ -2704,7 +2692,7 @@ dist_points_r = ro.r['dist_points_df']
 dist_points_df = pandas2ri.rpy2py(dist_points_r)
 
 # Sauvegarde des résultats dans un fichier texte
-with open("statistiques_par_cluster_area_non_0_avec_meteo.txt", "w", encoding="utf-8") as file:
+with open("39_viken_m2icdsd_2025_b2_statistiques_par_cluster_area_non_0_avec_meteo.txt", "w", encoding="utf-8") as file:
     file.write("===== Statistiques Descriptives par Cluster (surface brûlée non nulle, avec temp, RH et wind) =====\n")
     file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
     file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
@@ -2717,7 +2705,7 @@ with open("statistiques_par_cluster_area_non_0_avec_meteo.txt", "w", encoding="u
 print("=================Clustering ward avec X,Y,ISI,FWI,area non nulle et area nulle=========================")
 
 # Sélectionner les colonnes nécessaires
-df_selected = df_cleaned[['X', 'Y', 'ISI', 'FWI', 'area']]
+df_selected = df_cleaned[["X", "Y", "ISI", "FWI", "area"]]
 
 # Convertir en DataFrame R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2738,13 +2726,13 @@ ro.r('''
     df_r$cluster <- as.factor(clusters)
 
     # Tracer le dendrogramme et sauvegarder en fichier PNG
-    png("dendrogramme_clustering_area_sanstempRHwind.png", width = 800, height = 600)
+    png("40_viken_m2icdsd_2025_b2_dendrogramme_clustering_area_sanstempRHwind.png", width = 800, height = 600)
     plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
     dev.off()
 ''')
 
 # Sauvegarder le dendrogramme
-print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_sanstempRHwind.png'.")
+print("Le dendrogramme a été sauvegardé dans le fichier '40_viken_m2icdsd_2025_b2_dendrogramme_clustering_area_sanstempRHwind.png'.")
 
 # Visualiser les clusters avec un scatter plot
 ro.r('''
@@ -2770,9 +2758,8 @@ ro.r('''
             legend.text = element_text(color = "white", size = 10)  # Texte de légende
         )
 
-
     # Sauvegarder le scatter plot dans un fichier PNG
-    ggsave("visualisation_clusters_white_area_sanstempRHwind.png", plot = p, width = 8, height = 6)
+    ggsave("41_viken_m2icdsd_2025_b2_visualisation_clusters_white_area_sanstempRHwind.png", plot = p, width = 8, height = 6)
 ''')
 
 # Message de confirmation pour la visualisation
@@ -2826,7 +2813,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot ISI
-    ggsave("boxplot_isi_by_cluster_white_area_sanstempRHwind.png", plot = p1, width = 8, height = 6)
+    ggsave("42_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_white_area_sanstempRHwind.png", plot = p1, width = 8, height = 6)
 
     # Boxplot pour FWI
     p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
@@ -2844,7 +2831,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot FWI
-    ggsave("boxplot_fwi_by_cluster_white_area_sanstempRHwind.png", plot = p2, width = 8, height = 6)
+    ggsave("43_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_white_area_sanstempRHwind.png", plot = p2, width = 8, height = 6)
 
     # Boxplot pour Surface Brûlée (area)
     p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
@@ -2862,14 +2849,14 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot Surface Brûlée
-    ggsave("boxplot_area_by_cluster_white_area_sanstempRHwind.png", plot = p3, width = 8, height = 6)
+    ggsave("44_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_white_area_sanstempRHwind.png", plot = p3, width = 8, height = 6)
 ''')
 
 # Message de confirmation
 print("Les boxplots ont été sauvegardés sous les noms suivants :")
-print("1. Boxplot ISI : boxplot_isi_by_cluster_area_sanstempRHwind.png")
-print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_sanstempRHwind.png")
-print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_sanstempRHwind.png")
+print("1. Boxplot ISI : 42_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_area_sanstempRHwind.png")
+print("2. Boxplot FWI : 43_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_area_sanstempRHwind.png")
+print("3. Boxplot Surface Brûlée : 44_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_area_sanstempRHwind.png")
 
 # analyse des points du cluster 3
 dist_points = ro.r('''
@@ -2893,7 +2880,7 @@ dist_points_r = ro.r['dist_points_df']
 dist_points_df = pandas2ri.rpy2py(dist_points_r)
 
 # Sauvegarde des résultats dans un fichier texte
-with open("statistiques_par_cluster_area_sans_meteo.txt", "w", encoding="utf-8") as file:
+with open("45_viken_m2icdsd_2025_b2_statistiques_par_cluster_area_sans_meteo.txt", "w", encoding="utf-8") as file:
     file.write("===== Statistiques Descriptives par Cluster (surface brûlée nulle et non nulle sans temp, RH et wind) =====\n")
     file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
     file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
@@ -2905,7 +2892,7 @@ with open("statistiques_par_cluster_area_sans_meteo.txt", "w", encoding="utf-8")
 print("=================Clustering ward avec X,Y,ISI,FWI, temp, RH, wind, area non nulle et area nulle=========================")
 
 # Sélectionner les colonnes nécessaires
-df_selected = df_cleaned[['X', 'Y', 'ISI', 'FWI', 'temp', 'RH', 'wind', 'area']]
+df_selected = df_cleaned[["X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area"]]
 
 # Convertir en DataFrame R
 df_r = pandas2ri.py2rpy(df_selected)
@@ -2926,13 +2913,13 @@ ro.r('''
     df_r$cluster <- as.factor(clusters)
 
     # Tracer le dendrogramme et sauvegarder en fichier PNG
-    png("dendrogramme_clustering_area_avecmeteo.png", width = 800, height = 600)
+    png("46_viken_m2icdsd_2025_b2_dendrogramme_clustering_area_avecmeteo.png", width = 800, height = 600)
     plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
     dev.off()
 ''')
 
 # Sauvegarder le dendrogramme
-print("Le dendrogramme a été sauvegardé dans le fichier 'dendrogramme_clustering_area_avecmeteo.png'.")
+print("Le dendrogramme a été sauvegardé dans le fichier '46_viken_m2icdsd_2025_b2_dendrogramme_clustering_area_avecmeteo.png'.")
 
 # Visualiser les clusters avec un scatter plot
 ro.r('''
@@ -2958,9 +2945,8 @@ ro.r('''
             legend.text = element_text(color = "white", size = 10)  # Texte de légende
         )
 
-
     # Sauvegarder le scatter plot dans un fichier PNG
-    ggsave("visualisation_clusters_white_area_avecmeteo.png", plot = p, width = 8, height = 6)
+    ggsave("47_viken_m2icdsd_2025_b2_visualisation_clusters_white_area_avecmeteo.png", plot = p, width = 8, height = 6)
 ''')
 
 # Message de confirmation pour la visualisation
@@ -3014,7 +3000,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot ISI
-    ggsave("boxplot_isi_by_cluster_white_area_avecmeteo.png", plot = p1, width = 8, height = 6)
+    ggsave("48_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_white_area_avecmeteo.png", plot = p1, width = 8, height = 6)
 
     # Boxplot pour FWI
     p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
@@ -3032,7 +3018,7 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot FWI
-    ggsave("boxplot_fwi_by_cluster_white_area_avecmeteo.png", plot = p2, width = 8, height = 6)
+    ggsave("49_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_white_area_avecmeteo.png", plot = p2, width = 8, height = 6)
 
     # Boxplot pour Surface Brûlée (area)
     p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
@@ -3050,14 +3036,14 @@ ro.r('''
         ) 
 
     # Sauvegarder le boxplot Surface Brûlée
-    ggsave("boxplot_area_by_cluster_white_area_avecmeteo.png", plot = p3, width = 8, height = 6)
+    ggsave("50_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_white_area_avecmeteo.png", plot = p3, width = 8, height = 6)
 ''')
 
 # Message de confirmation
 print("Les boxplots ont été sauvegardés sous les noms suivants :")
-print("1. Boxplot ISI : boxplot_isi_by_cluster_area_avecmeteo.png")
-print("2. Boxplot FWI : boxplot_fwi_by_cluster_area_avecmeteo.png")
-print("3. Boxplot Surface Brûlée : boxplot_area_by_cluster_area_avecmeteo.png")
+print("1. Boxplot ISI : 48_viken_m2icdsd_2025_b2_boxplot_isi_by_cluster_area_avecmeteo.png")
+print("2. Boxplot FWI : 49_viken_m2icdsd_2025_b2_boxplot_fwi_by_cluster_area_avecmeteo.png")
+print("3. Boxplot Surface Brûlée : 50_viken_m2icdsd_2025_b2_boxplot_area_by_cluster_area_avecmeteo.png")
 
 # analyse des points du cluster 3
 dist_points = ro.r('''
@@ -3081,7 +3067,7 @@ dist_points_r = ro.r['dist_points_df']
 dist_points_df = pandas2ri.rpy2py(dist_points_r)
 
 # Sauvegarde des résultats dans un fichier texte
-with open("statistiques_par_cluster_area_avec_meteo.txt", "w", encoding="utf-8") as file:
+with open("51_viken_m2icdsd_2025_b2_statistiques_par_cluster_area_avec_meteo.txt", "w", encoding="utf-8") as file:
     file.write("===== Statistiques Descriptives par Cluster (surface brûlée nulle et non nulle avec temp, RH et wind)  =====\n")
     file.write("\n".join(summary_cluster_list))  # Écrire les stats descriptives capturées
     file.write("\n\n===== Moyennes des Variables par Cluster =====\n")
@@ -3100,12 +3086,16 @@ print("============== Fin Essai Clustering hiérarchique====================")
 print("Rappel des informations sur le dataframe df_cleaned")
 print(df_cleaned.info())
 
-# Convertir la colonne 'season' en chaînes de caractères
-df_cleaned['day'] = df_cleaned['day'].astype(str)
-df_cleaned['month'] = df_cleaned['month'].astype(str)
-df_cleaned['season'] = df_cleaned['season'].astype(str)
-df_cleaned['danger_level'] = df_cleaned['danger_level'].astype(str)
-df_cleaned['level_description'] = df_cleaned['level_description'].astype(str)
+# Convertir en chaînes de caractères les colonnes de type "category"
+df_cleaned["day"] = df_cleaned["day"].astype(str)
+df_cleaned["month"] = df_cleaned["month"].astype(str)
+df_cleaned["season"] = df_cleaned["season"].astype(str)
+df_cleaned["bscale"] = df_cleaned["bscale"].astype(str)
+df_cleaned["bscale_description"] = df_cleaned["bscale_description"].astype(str)
+df_cleaned["iscale"] = df_cleaned["iscale"].astype(str)
+df_cleaned["iscale_description"] = df_cleaned["iscale_description"].astype(str)
+df_cleaned["danger_level"] = df_cleaned["danger_level"].astype(str)
+df_cleaned["level_description"] = df_cleaned["level_description"].astype(str)
 
 # Connexion à PostgreSQL (connexion à la base par défaut 'postgres' pour créer une nouvelle base)
 def create_database(database_name, user, password, host, port):
@@ -3128,7 +3118,6 @@ def create_database(database_name, user, password, host, port):
     cursor.close()
     connection.close()
 
-
 # Connexion à la base de données PostgreSQL avec encodage UTF-8
 def connect_to_database(database_name, user, password, host, port):
     return psycopg2.connect(
@@ -3137,18 +3126,18 @@ def connect_to_database(database_name, user, password, host, port):
         password=password,
         host=host,
         port=port,
-        client_encoding='UTF8'  # Assurez-vous que l'encodage est UTF-8
+        client_encoding='UTF8'  # confirmer encodage UTF-8
     )
-
 
 # Créer la table dans la base de données
 def create_table(cur):
     table_creation_query = """
-    CREATE TABLE IF NOT EXISTS data_table_4 (
+    CREATE TABLE IF NOT EXISTS data_table_10 (
         X INTEGER,
         Y INTEGER,
         month VARCHAR,
         day VARCHAR,
+        season VARCHAR,
         FFMC FLOAT,
         DMC FLOAT,
         DC FLOAT,
@@ -3158,12 +3147,15 @@ def create_table(cur):
         wind FLOAT,
         rain FLOAT,
         area FLOAT,
-        season VARCHAR,
+        log_area FLOAT,
         BUI FLOAT,
         FWI FLOAT,
+        bscale VARCHAR,
+        bscale_description VARCHAR,
+        iscale VARCHAR,
+        iscale_description VARCHAR,
         danger_level VARCHAR,
-        level_description VARCHAR,
-        log_area FLOAT
+        level_description VARCHAR
     );
     """
     cur.execute(table_creation_query)
@@ -3172,25 +3164,32 @@ def create_table(cur):
 
 # Insérer les données du DataFrame dans la table
 def insert_data_from_dataframe(cur, df):
+
+    # Arrondir les colonnes "area" et "log_area" à un dixième
+    df["log_area"] = df["log_area"].round(1).astype(float)
+    df["area"] = df["area"].round(1).astype(float)
+
     # Convertir le DataFrame en une liste de tuples
-    data_tuples = [tuple(row) for row in df[['X', 'Y', 'month', 'day', 'FFMC', 'DMC', 'DC', 'ISI',
-                                             'temp', 'RH', 'wind', 'rain', 'area', 'season',
-                                             'BUI', 'FWI', 'danger_level', 'level_description',
-                                             'log_area']].values]
+    data_tuples = [tuple(row) for row in df[['X', 'Y', 'month', 'day', 'season', 'FFMC', 'DMC', 'DC', 'ISI',
+                                             'temp', 'RH', 'wind', 'rain', 'area', 'log_area',
+                                             'BUI', 'FWI', 'bscale', 'bscale_description',
+                                             'iscale', 'iscale_description',
+                                             'danger_level', 'level_description'
+                                             ]].values]
 
     insert_query = """
-    INSERT INTO data_table_4 (
-        X, Y, month, day, FFMC, DMC, DC, ISI, temp, RH, wind, rain, area,
-        season, BUI, FWI, danger_level, level_description, log_area
+    INSERT INTO data_table_10 (
+        X, Y, month, day, season, FFMC, DMC, DC, ISI, temp, RH, wind, rain, area,
+        log_area, BUI, FWI, bscale, bscale_description, iscale, iscale_description,
+        danger_level, level_description
     ) VALUES %s;
     """
 
     # Insertion des données en une seule requête
     execute_values(cur, insert_query, data_tuples)
 
-
 # Paramètres de connexion
-database_name = "viken_db_5"  # Nom de votre base de données
+database_name = "viken_db_10"  # Nom de votre base de données
 user = "postgres"  # Votre utilisateur PostgreSQL
 password = "formationviken"  # Votre mot de passe PostgreSQL
 host = "localhost"  # Hôte PostgreSQL (ici localhost)
