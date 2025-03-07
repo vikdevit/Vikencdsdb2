@@ -512,20 +512,23 @@ for col in num_vars:
 
     # Sauvegarde des figures en PNG
     plt.savefig(os.path.join(save_dir, f"{col}.png"), format="png", dpi=300)
-    plt.close()  # Fermer la figure pour éviter l'affichage multiple
+    plt.close()
 
-# Visualisation des variables catégoriques**
+# Visualisation des variables catégoriques
 for col in cat_vars:
     # Trier les catégories par ordre croissant
     sorted_categories = sorted(df_cleaned[col].unique())
-    plt.figure(figsize=(35, 20))
+    plt.figure(figsize=(45, 30))
     sns.countplot(x=df_cleaned[col], palette="viridis", order=sorted_categories)
-    plt.title(f"Répartition de {col}", fontsize=30)
-    plt.xlabel(col, fontsize=25)
-    plt.ylabel("Nombre d'observations", fontsize=26)
-    plt.xticks(rotation=10, fontsize = 22, fontweight ="bold")
+    plt.title(f"Répartition de {col}", fontsize=40)
+    plt.xlabel(col, fontsize=22)
+    plt.ylabel("Nombre d'observations", fontsize=35)
+    plt.xticks(rotation=10, fontsize = 35, fontweight ="bold")
 
-    # Sauvegarde des figures en PNG et PDF
+    # Taille des ticks de l'axe y (valeurs sur l'axe des ordonnées)
+    plt.yticks(fontsize=35, fontweight="bold")
+
+    # Sauvegarde des figures en PNG
     plt.savefig(os.path.join(save_dir, f"{col}.png"), format="png", dpi=300)
     plt.close()
 
@@ -658,9 +661,6 @@ plots_groups = {
     "Area": ["area", "log_area"]
 }
 
-# Création du fichier PDF
-#pdf_path = os.path.join(save_dir, "boxplots_with_stats.pdf")
-#with PdfPages(pdf_path) as pdf:
 # Génération des boxplots
 for page_name, cols in plots_groups.items():
     fig, axes = plt.subplots(nrows=1, ncols=len(cols), figsize=(6 * len(cols), 6))
@@ -674,36 +674,12 @@ for page_name, cols in plots_groups.items():
         ax = axes[i]
         sns.boxplot(y=df_cleaned[col], ax=ax, color="royalblue", width=0.5)
 
-        """ # Calcul des statistiques
-        Q1 = df_cleaned[col].quantile(0.25)
-        Q2 = df_cleaned[col].median()  # Médiane
-        Q3 = df_cleaned[col].quantile(0.75)
-        Q4 = df_cleaned[col].max()
-        mean_value = df_cleaned[col].mean()
-
-        # Ajout des valeurs sur le graphique
-        statist = {
-            "Q1": Q1,
-            "Médiane (Q2)": Q2,
-            "Q3": Q3,
-            "Max (Q4)": Q4,
-            "Moyenne": mean_value
-        }"""
-
-        """# Positionner les textes sur le graphique
-        for j, (stat_name, value) in enumerate(statist.items()):
-            ax.text(0, value, f"{stat_name}: {value:.2f}", ha='center', va='bottom',
-                    fontsize=10, fontweight='bold', bbox=dict(facecolor='white', alpha=0.6))"""
-
         # Ajout du titre et labels
         ax.set_title(f"Boxplot de {col}", fontsize=14, fontweight='bold')
         ax.set_ylabel(col, fontsize=12)
         ax.grid(axis='x', linestyle='--', alpha=0.7)
 
     plt.tight_layout()
-
-    # Sauvegarde en PDF
-    #pdf.savefig(fig)
 
     # Sauvegarde en PNG
     png_path = os.path.join(save_dir, f"boxplot_{page_name}.png")
@@ -752,9 +728,8 @@ for col in df_cleaned.select_dtypes(include=[np.number]).columns:
 # Création du DataFrame des statistiques
 desc_stats_df = pd.DataFrame(statistics).T
 
-# Création du fichier PDF et PNG pour sauvegarder
+# Création du fichier PDF pour sauvegarder
 pdf_path = os.path.join(save_dir, "descriptive_statistics.pdf")
-#png_path = os.path.join(save_dir, "descriptive_statistics.png")
 
 with PdfPages(pdf_path) as pdf:
     # Tracer les statistiques sous forme de tableau
@@ -771,9 +746,6 @@ with PdfPages(pdf_path) as pdf:
 
     # Sauvegarder le tableau en PDF
     pdf.savefig(fig)
-
-    # Sauvegarder le tableau en PNG
-    #plt.savefig(png_path, dpi=300)
 
     plt.close()
 
@@ -1121,12 +1093,8 @@ print("#########################################################################
 
 # Visualisation d'autres pairplots
 
-# Fonction de sauvegarde pour les heatmaps et pairplots
+# Fonction de sauvegarde pour les pairplots
 def save_figure(fig, file_name, save_dir):
-    """Sauvegarde les figures sous format PNG et PDF."""
-    """if not os.path.exists(save_dir):
-        os.makedirs(save_dir)  # Créer le répertoire s'il n'existe pas"""
-
     fig.savefig(os.path.join(save_dir, f"{file_name}.png"), bbox_inches='tight')
     plt.close(fig)
 
@@ -1196,24 +1164,24 @@ correlation_spearman_asym = df_cleaned[["log_area"]+colonnes_asymetriques].corr(
 correlation_spearman_mixed = df_cleaned[["log_area"]+colonnes_normales + colonnes_asymetriques].corr(method='spearman')  # (Tout en Spearman)
 
 # Affichage des matrices
-print("\n🔹 Matrice de Corrélation Pearson (Colonnes Normales):\n", correlation_pearson)
-print("\n🔹 Matrice de Corrélation Spearman (Colonnes Asymétriques):\n", correlation_spearman_asym)
-print("\n🔹 Matrice de Corrélation Spearman (Mélange Normales & Asymétriques):\n", correlation_spearman_mixed)
+print("\n Matrice de Corrélation Pearson (Colonnes Normales):\n", correlation_pearson)
+print("\n Matrice de Corrélation Spearman (Colonnes Asymétriques):\n", correlation_spearman_asym)
+print("\n Matrice de Corrélation Spearman (Mélange Normales & Asymétriques):\n", correlation_spearman_mixed)
 
 # Création des heatmaps
 fig, axes = plt.subplots(1, 3, figsize=(25, 7))
 
 # Heatmap Pearson (Normales vs Normales)
 sns.heatmap(correlation_pearson, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5, ax=axes[0])
-axes[0].set_title("🔹 Matrice de Corrélation de Pearson (Colonnes Normales)")
+axes[0].set_title(" Matrice de Corrélation de Pearson (Colonnes Normales)")
 
 # Heatmap Spearman (Asymétriques vs Asymétriques)
 sns.heatmap(correlation_spearman_asym, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5, ax=axes[1])
-axes[1].set_title("🔹 Matrice de Corrélation de Spearman (Colonnes Asymétriques)")
+axes[1].set_title(" Matrice de Corrélation de Spearman (Colonnes Asymétriques)")
 
 # Heatmap Spearman (Mélange Normales et Asymétriques)
 sns.heatmap(correlation_spearman_mixed, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5, ax=axes[2])
-axes[2].set_title("🔹 Matrice de Corrélation de Spearman (Tout)")
+axes[2].set_title(" Matrice de Corrélation de Spearman (Tout)")
 
 # Sauvegarde des figures
 plt.tight_layout()
@@ -1234,10 +1202,6 @@ print("\nStatistiques descriptives - Surface brûlée nulle:")
 print(df_area_0.describe())
 
 def save_heatmap(heatmap, file_name, save_dir):
-    """Sauvegarde les heatmaps sous format PNG et PDF."""
-    """if not os.path.exists(save_dir):
-        os.makedirs(save_dir)  # Créer le répertoire s'il n'existe pas"""
-
     plt.savefig(os.path.join(save_dir, f"{file_name}.png"), bbox_inches='tight')
     plt.close()
 
@@ -1264,6 +1228,12 @@ colonnes_normales_non_brule = [var for var, is_normal in normality_results["non_
 colonnes_asymetriques_non_brule = [var for var, is_normal in normality_results["non_brulé"].items() if not is_normal]
 
 # Corrélation Pearson pour les colonnes normales
+
+if not colonnes_normales_brule:
+    print("Aucune colonne normale pour la zone brûlée.")
+else:
+    print("Colonnes normales pour la zone brûlée :", colonnes_normales_brule)
+
 if colonnes_normales_brule:
     pearson_corr_burned = df_area_non_0[["log_area"] + colonnes_normales_brule].corr(method='pearson')
     plt.figure(figsize=(10, 6))
@@ -1424,11 +1394,6 @@ with PdfPages(pdf_path) as pdf:
     plt.close()
 
 print(f"Rapport du test du Chi² sauvegardé dans {pdf_path}")
-
-#puis envisager de lancer des modèles types PCA, clustering, régression logistique, random forest et autres modèles avec R, Python Scikit learn et autres
-# ensuite regarder s'il faut enlever des outliers
-# regarder aussi établissement d'une échelle de risque avec les relations trouvées et FWI
-# puis faire l'injection d'une base de données propre avec données clés et trouvées et propres vers postgresql
 
 # ANOVA et test de Kruskal-Wallis pour comparer les surfaces brulées selon catégories des différentes colonnes
 
@@ -2385,7 +2350,7 @@ ro.r('''
         scale_color_manual(values = c("red", "green", "blue")) +
         
         theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            plot.title = element_text(color = "white", face = "bold", size = 14),  # Titre en blanc et en gras
             axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
             axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
             axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
@@ -2475,7 +2440,7 @@ ro.r('''
         labs(title = "Distribution de la Surface Brûlée par cluster Dward area_non_0_sanstempRHwind", x = "Cluster", y = "Surface Brûlée (area)") +
         theme_minimal() +
         theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            plot.title = element_text(color = "white", face = "bold", size = 13),  # Titre en blanc et en gras
             axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
             axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
             axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
@@ -2572,7 +2537,7 @@ ro.r('''
         scale_color_manual(values = c("red", "green", "blue")) +
 
         theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            plot.title = element_text(color = "white", face = "bold", size = 14),  # Titre en blanc et en gras
             axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
             axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
             axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
@@ -2662,7 +2627,7 @@ ro.r('''
         labs(title = "Distribution de la Surface Brûlée par cluster Dward area_non_0_avecmeteo", x = "Cluster", y = "Surface Brûlée (area)") +
         theme_minimal() +
         theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            plot.title = element_text(color = "white", face = "bold", size = 13),  # Titre en blanc et en gras
             axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
             axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
             axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
@@ -2737,7 +2702,7 @@ ro.r('''
     df_r$cluster <- as.factor(clusters)
 
     # Tracer le dendrogramme et sauvegarder en fichier PNG
-    png("40_viken_m2icdsd_2025_b2_dendrogramme_clusteringDward_area_sanstempRHwind.png", width = 800, height = 600)
+    png("40_viken_m2icdsd_2025_b2_dendrogramme_clusteringDward_area_sanstempRHwind.png", width = 1500, height = 600)
     plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
     dev.off()
 ''')
@@ -2760,7 +2725,7 @@ ro.r('''
         scale_color_manual(values = c("red", "green", "blue")) +
 
         theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            plot.title = element_text(color = "white", face = "bold", size = 13),  # Titre en blanc et en gras
             axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
             axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
             axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
@@ -2850,7 +2815,7 @@ ro.r('''
         labs(title = "Distribution de la Surface Brûlée par cluster Dward area_sanstempRHwind", x = "Cluster", y = "Surface Brûlée (area)") +
         theme_minimal() +
         theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
+            plot.title = element_text(color = "white", face = "bold", size = 13),  # Titre en blanc et en gras
             axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
             axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
             axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
@@ -3077,181 +3042,6 @@ dist_points_r = ro.r['dist_points_df']
 # Convertir mean_by_cluster en dataframe pandas
 dist_points_df = pandas2ri.rpy2py(dist_points_r)
 
-## Sélectionner les colonnes nécessaires
-df_selected = df_cleaned[["X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area"]]
-
-# Convertir en DataFrame R
-df_r = pandas2ri.py2rpy(df_selected)
-ro.globalenv["df_r"] = df_r
-
-# Clustering hiérarchique en R
-ro.r('''
-    # Normalisation des données
-    df_scaled <- scale(df_r)
-
-    # Clustering hiérarchique avec méthode de Ward
-    hc <- hclust(dist(df_scaled), method = "ward.D2")
-
-    # Couper l'arbre pour obtenir 3 clusters
-    clusters <- cutree(hc, k = 3)
-
-    # Ajouter les clusters au DataFrame
-    df_r$cluster <- as.factor(clusters)
-
-    # Tracer le dendrogramme et sauvegarder en fichier PNG
-    png("46_viken_m2icdsd_2025_b2_dendrogramme_clusteringDward_area_avecmeteo.png", width = 800, height = 600)
-    plot(hc, main = "Dendrogramme du Clustering Hiérarchique", xlab = "", sub = "", cex = 0.9)
-    dev.off()
-''')
-
-# Sauvegarder le dendrogramme
-print("Le dendrogramme a été sauvegardé dans le fichier '46_viken_m2icdsd_2025_b2_dendrogramme_clusteringDward_area_avecmeteo.png'.")
-
-# Visualiser les clusters avec un scatter plot
-ro.r('''
-
-    # Vérifier la distribution des clusters
-    print(table(df_r$cluster))
-
-    # Créer un graphique de dispersion des points avec leurs clusters
-    p <- ggplot(df_r, aes(x = X, y = Y, color = cluster)) +
-        geom_point(size = 3, alpha = 0.7) +
-        labs(title = "Visualisation des Clusters Dward en fonction de X et Y area_avecmeteo",
-             x = "Coordonnée X", y = "Coordonnée Y") +
-        theme_minimal() +
-        scale_color_manual(values = c("red", "green", "blue")) +
-
-        theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
-            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
-            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
-            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
-            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
-            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
-            legend.text = element_text(color = "white", size = 10)  # Texte de légende
-        )
-
-    # Sauvegarder le scatter plot dans un fichier PNG
-    ggsave("47_viken_m2icdsd_2025_b2_visualisation_clustersDward_white_area_avecmeteo.png", plot = p, width = 8, height = 6)
-''')
-
-# Message de confirmation pour la visualisation
-print(f"Le graphique des clusters a été sauvegardé.")
-
-# Code pour obtenir les statistiques descriptives par cluster
-summary_cluster = ro.r('''
-    # Statistiques descriptives pour chaque cluster
-    summary_cluster <- by(df_r[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")], df_r$cluster, summary)
-    print(summary_cluster)
-    # Récupérer les statistiques descriptives sous forme de texte
-    summary_cluster_text <- capture.output(summary_cluster)
-''')
-
-# Récupérer les statistiques descriptives sous forme de texte
-summary_cluster_r = ro.r['summary_cluster_text']
-
-# Convertir les résultats en Python (ils sont maintenant sous forme de liste de chaînes de caractères)
-summary_cluster_list = list(summary_cluster_r)
-
-# Code pour calculer les moyennes des variables par cluster
-df_means = ro.r('''
-    # Moyennes des variables par cluster
-    mean_by_cluster <- aggregate(df_r[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")], by = list(cluster = df_r$cluster), FUN = mean)
-    print(mean_by_cluster)
-''')
-mean_by_cluster_r = ro.r['mean_by_cluster']
-
-# Convertir mean_by_cluster en dataframe pandas
-mean_by_cluster_df = pandas2ri.rpy2py(mean_by_cluster_r)
-
-# Code pour générer et sauvegarder les boxplots pour chaque variable
-# Code pour créer et sauvegarder les boxplots par cluster
-ro.r('''
-    # Charger le package ggplot2
-    library(ggplot2)
-
-    # Boxplot pour ISI
-    p1 <- ggplot(df_r, aes(x = as.factor(cluster), y = ISI, fill = as.factor(cluster))) +
-        geom_boxplot() +
-        labs(title = "Distribution de ISI par cluster Dward area_avecmeteo", x = "Cluster", y = "ISI") +
-        theme_minimal() +
-        theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
-            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
-            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
-            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
-            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
-            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
-            legend.text = element_text(color = "white", size = 10)  # Texte de légende
-        ) 
-
-    # Sauvegarder le boxplot ISI
-    ggsave("48_viken_m2icdsd_2025_b2_boxplot_isi_by_clusterDward_white_area_avecmeteo.png", plot = p1, width = 8, height = 6)
-
-    # Boxplot pour FWI
-    p2 <- ggplot(df_r, aes(x = as.factor(cluster), y = FWI, fill = as.factor(cluster))) +
-        geom_boxplot() +
-        labs(title = "Distribution de FWI par cluster Dward area_avecmeteo", x = "Cluster", y = "FWI") +
-        theme_minimal() +
-        theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
-            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
-            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
-            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
-            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
-            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
-            legend.text = element_text(color = "white", size = 10)  # Texte de légende
-        ) 
-
-    # Sauvegarder le boxplot FWI
-    ggsave("49_viken_m2icdsd_2025_b2_boxplot_fwi_by_clusterDward_white_area_avecmeteo.png", plot = p2, width = 8, height = 6)
-
-    # Boxplot pour Surface Brûlée (area)
-    p3 <- ggplot(df_r, aes(x = as.factor(cluster), y = area, fill = as.factor(cluster))) +
-        geom_boxplot() +
-        labs(title = "Distribution de la Surface Brûlée par cluster Dward area_avecmeteo", x = "Cluster", y = "Surface Brûlée (area)") +
-        theme_minimal() +
-        theme(
-            plot.title = element_text(color = "white", face = "bold", size = 16),  # Titre en blanc et en gras
-            axis.title.x = element_text(color = "white", face = "bold", size = 12), # Titre axe X
-            axis.title.y = element_text(color = "white", face = "bold", size = 12), # Titre axe Y
-            axis.text.x = element_text(color = "white", size = 10),  # Texte axe X
-            axis.text.y = element_text(color = "white", size = 10),  # Texte axe Y
-            legend.title = element_text(color = "white", face = "bold", size = 12),  # Légende en blanc et en gras
-            legend.text = element_text(color = "white", size = 10)  # Texte de légende
-        ) 
-
-    # Sauvegarder le boxplot Surface Brûlée
-    ggsave("50_viken_m2icdsd_2025_b2_boxplot_area_by_clusterDward_white_area_avecmeteo.png", plot = p3, width = 8, height = 6)
-''')
-
-# Message de confirmation
-print("Les boxplots ont été sauvegardés sous les noms suivants :")
-print("1. Boxplot ISI : 48_viken_m2icdsd_2025_b2_boxplot_isi_by_clusterDward_area_avecmeteo.png")
-print("2. Boxplot FWI : 49_viken_m2icdsd_2025_b2_boxplot_fwi_by_clusterDward_area_avecmeteo.png")
-print("3. Boxplot Surface Brûlée : 50_viken_m2icdsd_2025_b2_boxplot_area_by_clusterDward_area_avecmeteo.png")
-
-# analyse des points du cluster 3
-dist_points = ro.r('''
-    # Extraire les points du cluster 3
-    cluster_3_points <- subset(df_r, cluster == 3)
-    print(cluster_3_points)
-
-    # Analyser les distances entre points
-    dist_points <- dist(cluster_3_points[, c("X", "Y", "ISI", "FWI", "temp", "RH", "wind", "area")])
-
-    # Convertir en matrice pour une meilleure gestion en Python
-    dist_points_matrix <- as.matrix(dist_points)
-
-    # Convertir la matrice en dataframe (facilite la conversion en pandas)
-    dist_points_df <- as.data.frame(dist_points_matrix)
-    print(dist_points_df)
-''')
-dist_points_r = ro.r['dist_points_df']
-
-# Convertir mean_by_cluster en dataframe pandas
-dist_points_df = pandas2ri.rpy2py(dist_points_r)
-
 # Sauvegarde des résultats dans un fichier texte
 with open("51_viken_m2icdsd_2025_b2_statistiques_par_clusterDward_area_avec_meteo.txt", "w", encoding="utf-8") as file:
     file.write(
@@ -3262,13 +3052,7 @@ with open("51_viken_m2icdsd_2025_b2_statistiques_par_clusterDward_area_avec_mete
     file.write("\n\n===== Distances entre les Points du Cluster 3 =====\n")
     file.write(dist_points_df.to_string())  # Écrire les distances dans le fichier
 
-# reste à rendre visible les moustaches des boxplots
-#reste aussi à faire fichier maj des dépendances requirement.txt avec pip list et freeze
-
 print("============== Fin Essai Clustering hiérarchique====================")
-
-print("============== Essai Clustering DBSCAN pour mieux discriminer les zones denses de feu ==============")
-# A essayer
 
 # 4 Création et Alimentation de la Base de données traitée en utilisant PostGreSQL depuis Python
 
@@ -3435,9 +3219,4 @@ finally:
     if conn:
         conn.close()
 
-# Reste à faire  le 4/2/25
-# lancer les modélisation sous rpy2 voir fin chatgpt du 4/2/25 avec des séries de relations recherchées ex: isi etc. voir prépa données dictionaires de df relations rpy2/python
-# tester les modèles puis afficher les métriques dont roc curve avec rpy2/python (voir s'il faut avant standardisation/normalisation/ encodage/ retirer ou garder outlier)
-# enchaîner avec clustering hiérarchique et dendogramme rpy2/ Python puis afficher le dendogramme
-# restera ensuite à faire un modèle de prédiction feu / pas feu avec rpy2 et python
-# rebalayer le code pour améliorer visualisations et retirer ce qui est superflu et intégrer une gestion des outliers
+
