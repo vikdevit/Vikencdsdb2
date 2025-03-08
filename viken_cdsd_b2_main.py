@@ -794,7 +794,7 @@ barplot_sum_filename_png = os.path.join(save_dir, "barplot_sum_surface_brulee.pn
 plt.savefig(barplot_sum_filename_png)
 plt.close()
 
-# 3. Diagramme en barres pour la moyenne de la surface brûlée par mois
+# Diagramme en barres pour la moyenne de la surface brûlée par mois
 monthly_avg = df_area_non_0.groupby("month")["area"].mean().reset_index()  # Moyenne de la surface brûlée par mois
 plt.figure(figsize=(10, 6))
 sns.barplot(data=monthly_avg, x='month', y='area', palette="Set3", order=mois_ordre)
@@ -807,6 +807,70 @@ plt.tight_layout()
 # Sauvegarde du graphique en .png
 barplot_avg_filename_png = os.path.join(save_dir, "barplot_avg_surface_brulee.png")
 plt.savefig(barplot_avg_filename_png)
+plt.close()
+
+# Diagramme en barres pour la quantité maximale de pluie enregistrée par mois
+monthly_max_rain = df_cleaned.groupby("month")["rain"].max().reset_index()
+plt.figure(figsize=(10, 6))
+sns.barplot(data=monthly_max_rain, x='month', y='rain', palette="Blues", order=mois_ordre)
+plt.title("Quantité Maximale de Pluie Enregistrée par Mois")
+plt.xlabel("Mois")
+plt.ylabel("Quantité Maximale de Pluie (mm)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+# Sauvegarde du graphique en .png
+barplot_max_rain_filename_png = os.path.join(save_dir, "barplot_max_rain.png")
+plt.savefig(barplot_max_rain_filename_png)
+plt.close()
+
+# Diagramme en barre pour quantité maximale de pluie enregistrée par mois et afficher le jour correspondant
+monthly_max_rain_day = df_cleaned.loc[df_cleaned.groupby("month")["rain"].idxmax(), ["month", "rain", "day"]].reset_index(drop=True)
+plt.figure(figsize=(10, 6))
+ax = sns.barplot(data=monthly_max_rain_day, x='month', y='rain', palette="Blues", order=mois_ordre)
+
+# Récupérer les positions réelles des barres sur l'axe X
+x_positions = {month: i for i, month in enumerate(mois_ordre)}
+
+# Ajout des labels du jour de la semaine au-dessus des barres (uniquement si rain > 0)
+for _, row in monthly_max_rain_day.iterrows():
+    if row["rain"] > 0:  # Vérifie que la quantité de pluie n'est pas nulle
+        x_pos = x_positions[row["month"]]  # Trouver la vraie position X du mois
+        plt.text(x_pos, row["rain"] + 0.2, row["day"], ha='center', fontsize=10, color='black', fontweight='bold')
+
+plt.title("Quantité Maximale de Pluie par Mois et Jour Correspondant")
+plt.xlabel("Mois")
+plt.ylabel("Quantité Maximale de Pluie (mm)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+
+# Sauvegarde du graphique en .png
+barplot_max_rain_png = os.path.join(save_dir, "barplot_max_rain_day.png")
+plt.savefig(barplot_max_rain_png)
+plt.close()
+
+# Affichage des régions géographiques du parc qui connaissent les plus grands incendies
+plt.figure(figsize=(10, 8))
+scatter = sns.scatterplot(
+    data=df_cleaned,
+    x="X", y="Y",
+    size="area",  # La taille des cercles est proportionnelle à area
+    sizes=(10, 500),  # Ajustement des tailles min et max des cercles
+    hue="area",  # La couleur peut aussi varier en fonction de la surface brûlée
+    palette="viridis",  # Palette de couleurs pour visualiser l'intensité
+    edgecolor="black",  # Contour des cercles pour une meilleure visibilité
+    alpha=0.6  # Transparence pour éviter un affichage trop chargé
+)
+
+# Titre et labels
+plt.title("Régions du parc de Montesinho qui connaissent les plus grands incendies", fontsize=14)
+plt.xlabel("X (Longitude)", fontsize=12)
+plt.ylabel("Y (Latitude)", fontsize=12)
+plt.legend(title="Surface Brûlée (ha)", loc="upper left", fontsize=10)
+
+# Sauvegarde du graphique
+scatterplot_filename = os.path.join(save_dir, "scatterplot_regionsparc_grands_incendies.png")
+plt.savefig(scatterplot_filename)
 plt.close()
 
 print("Les graphiques de surface brûlée mensuelle ont été enregistrés.")
