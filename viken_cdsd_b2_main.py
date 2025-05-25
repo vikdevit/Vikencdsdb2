@@ -1184,7 +1184,10 @@ print("Les pairplots ont été générés et sauvegardés.")
 df_grouped = df_cleaned.groupby("month")["FWI"].agg(["max", "min", "mean"])
 
 # Remettre les mois dans l'ordre calendaire
-df_grouped = df_grouped.sort_index()
+#df_grouped = df_grouped.sort_index()
+
+mois_ordre = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+df_grouped = df_grouped.loc[mois_ordre]
 
 # Création de la figure et des axes
 plt.figure(figsize=(10, 6))
